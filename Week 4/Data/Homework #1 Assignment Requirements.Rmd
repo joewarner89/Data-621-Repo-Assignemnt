@@ -1,0 +1,518 @@
+---
+title: 'Homework #1 Assignment Requirements'
+author: "Warner Alexis"
+date: "2024-09-17"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+In this assignment, I will be exploring, analyzing and modeing the **money ball dataset**. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record
+has the performance of the team for the given year, with all of the statistics adjusted to match the performance of
+a 162 game season. the purpose of this assignment is to build a multiple linear regression model on the training data to predict the number of wins
+for the team.
+
+
+
+## Descriptive Analysis
+
+
+> Variables: 
+
+**INDEX** Identification Variable (do not use)
+
+**TARGET_WINS** Number of wins
+
+**TEAM_BATTING_H** Base Hits by batters (1B,2B,3B,HR)  
+
+**TEAM_BATTING_2B** Doubles by batters (2B) 
+
+**TEAM_BATTING_3B** Triples by batters (3B)  
+
+**TEAM_BATTING_HR** Homeruns by batters (4B) 
+
+**TEAM_BATTING_BB** Walks by batters Positive 
+
+**TEAM_BATTING_HBP** Batters hit by pitch (get a free base)  
+
+**TEAM_BATTING_SO** Strikeouts by batters 
+
+
+**TEAM_BASERUN_SB** Stolen bases 
+
+**TEAM_BASERUN_CS** Caught stealing 
+
+**TEAM_FIELDING_E** Errors 
+
+**TEAM_FIELDING_DP** Double Plays 
+
+**TEAM_PITCHING_BB** Walks allowed 
+
+**TEAM_PITCHING_H** Hits allowed 
+
+**TEAM_PITCHING_HR** Homeruns allowed 
+
+**TEAM_PITCHING_SO** Strikeouts by pitchers 
+
+
+```{r,warning=FALSE}
+# Loading library
+library(tidyverse)
+library(ggplot2)
+library(DataExplorer)
+library(mice)
+library(kableExtra)
+library(corrplot)
+library(reshape)
+library(reshape2)
+library(caret)
+library(dplyr)
+library(factoextra)
+library(caret)  # for data splitting and pre-processing
+library(stats) 
+```
+
+
+we have two data sets: 
+-** a training set : where most analysis will be doing
+-** A evaluation set Which will be used to evaluate the model
+
+
+
+
+
+
+```{r}
+# load data money ball 
+#evaluation set use for test set 
+money_ball_eval <- read.csv('moneyball-evaluation-data.csv')
+# training  set 
+money_ball_train <- read.csv('moneyball-training-data.csv')
+str(money_ball_train)
+introduce(money_ball_train)
+
+# Data Description 
+money_ball_train %>% 
+  summary() %>%
+  kable() %>% kable_styling() %>%  kable_classic(full_width = F, html_font = "Cambria")
+
+str(money_ball_train)
+```
+
+
+## Data Preparation
+
+We are going to check distribution for all the columns and outliers that are present in the data set. The Chart below shows the percentage accounted for missing values in the data set. We notice that TEAM_BATTING_HBP  has the highest number of missing values but, the mean, the median, the max are around the same rangle which mean that column is skewed centerely. 
+
+
+
+```{r}
+# Correlation Plot
+cor_matrix <- cor(money_ball_train, use = 'complete.obs')
+corrplot(cor_matrix, method = 'circle')
+
+money <- money_ball_train
+# Create missing data flags
+
+# Create missing data flags
+#missing_flag <- ifelse(is.na(money_ball_train$TEAM_BATTING_HBP), 1, 2)
+#money_ball_train$missing_flag <- missing_flag
+
+
+par(mfrow=c(3,3)) 
+# Create distribution plot to check outliers 
+for (i in 1:17) {
+  hist(money[,i],main=names(money[i]),xlab=names(money[i]),breaks = 51)
+  boxplot(money[,i], main=names(money[i]), type="l",horizontal = TRUE)
+  
+  plot(money[,i], money$TARGET_WINS, main = names(money[i]), xlab=names(money[i]))
+  abline(lm(money$TARGET_WINS ~ money[,i], data = money), col = "blue")
+}
+```
+
+
+
+
+
+The relationship between the target variable and the predictors is not particularly strong, but there are statistically significant relationships with certain variables. The calculate_correlations_with_pvalues function computes the correlation coefficients and p-values between a given target variable and all other predictor variables in a dataset. It first validates the input to ensure that the target variable is present and that the data contains no missing values. For each predictor, the function performs a correlation test using cor.test(), which returns both the correlation coefficient and the corresponding p-value. These results are stored in a data frame, with both the correlation and p-value rounded to 10 decimal places for precision. This function offers a clear, organized output, making it easy for users to evaluate the strength and statistical significance of the relationships between the target variable and the predictors.
+
+
+
+```{r}
+calculate_correlations_with_pvalues <- function(data, target_col) {
+  # Check if target_col is a character string
+  if (!is.character(target_col) || length(target_col) != 1) {
+    stop("target_col must be a single character string.")
+  }
+  
+  # Ensure the target column exists in the data
+  if (!target_col %in% names(data)) {
+    stop("Target column not found in the dataframe.")
+  }
+  
+  # Remove rows with missing values
+  data_complete <- data[complete.cases(data), ]
+  
+  # Initialize a results data frame
+  results <- data.frame(Predictor = character(), Correlation = numeric(), PValue = numeric(), stringsAsFactors = FALSE)
+  
+  # Loop through each predictor variable
+  for (predictor in names(data_complete)[names(data_complete) != target_col]) {
+    # Perform the correlation test
+    test_result <- cor.test(data_complete[[predictor]], data_complete[[target_col]])
+    
+    # Store the rounded results to 10 decimal places
+    results <- rbind(results, data.frame(Predictor = predictor, 
+                                         Correlation = round(test_result$estimate, 10), 
+                                         PValue = round(test_result$p.value, 10)))
+  }
+  
+  return(results)
+}
+
+
+# Example usage
+correlation_results <- calculate_correlations_with_pvalues(money_ball_train, "TARGET_WINS")
+
+# View the results
+print(correlation_results)
+```
+
+
+Now let dive into the Missing values. 
+
+
+
+```{r}
+
+# 
+plot_intro(money_ball_train, title = 'Missing Information on Meny Ball Dataset',
+           ggtheme = theme_minimal())
+# Plot missing volume in Column 
+plot_missing(money_ball_train,title = 'Information about Missing Value in money ball dataset',ggtheme = theme_minimal())
+```
+
+we have discovered that there are some observations that are missing data. These column names will need imputation after analysis. 
+We have about 9% of the data missing that spread out to 
+> TEAM_PITCHING_SO 4.48%
+> TEAM_BATTING_SO 4.48%
+> TEAM_BASERUN_SB 5.76%
+> TEAM_BASERUN_CS 12.57%
+> TEAM_BATTING_HBP 91.61%
+
+
+**Why Use Predictive Imputation?**
+
+**Preserves Relationships**: Predictive imputation uses the relationships between variables to estimate missing values, which can lead to more accurate and reliable data sets.
+
+**Handles Different Types of Missing Data**: It can handle data that is Missing Completely at Random (MCAR), Missing at Random (MAR), and even some cases of Missing Not at Random (MNAR).
+**Maintains Variability**: Unlike simple imputation methods (mean, median), predictive imputation maintains the natural variability in the data.
+
+```{r}
+# re-assign moneyball
+money <- money_ball_train
+# create data set with with predictive imputable 
+# Compute multiple imputation 
+data1 <- mice(money, method = 'pmm', m=5)
+completed_data <- complete(data1)
+
+money_ball_eval <- mice(money_ball_eval, method = 'pmm', m=5)
+money_ball_eval <- complete(money_ball_eval)
+# View missing value distribution
+plot_missing(completed_data)
+
+
+plot_scatterplot(money[,-c(1,11)],by="TARGET_WINS", nrow = 1L, ncol = 2L)
+
+# after data transformation 
+par(mfrow=c(3,3)) 
+for (i in 1:17) {
+  hist(completed_data[,i],main=names(completed_data[i]),xlab=names(completed_data[i]),breaks = 51)
+  boxplot(completed_data[,i], main=names(completed_data[i]), type="l",horizontal = TRUE)
+  
+  plot(completed_data[,i], completed_data$TARGET_WINS, main = names(completed_data[i]), xlab=names(completed_data[i]))
+  abline(lm(completed_data$TARGET_WINS ~ completed_data[,i], data = completed_data), col = "blue")
+}
+
+```
+
+
+# Dealing with Outliers
+
+The `remove_outliers_df` function removes outliers from all numeric columns in a dataset using the **Interquartile Range (IQR)** method. It loops through each column, checks if it's numeric, and calculates the first (Q1) and third quartiles (Q3) to determine the IQR. It then sets upper and lower bounds as `Q1 - 1.5 * IQR` and `Q3 + 1.5 * IQR`, and removes any rows where the values in a numeric column fall outside these bounds. Non-numeric columns are ignored, ensuring only numeric data is affected. This results in a dataset with outliers removed from all numeric columns.
+
+
+```{r}
+
+remove_outliers_df <- function(df) {
+  # Loop through each numeric column in the data frame
+  for (col in names(df)) {
+    if (is.numeric(df[[col]])) {
+      # Calculate Q1, Q3, and IQR for the column
+      Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
+      Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
+      IQR_value <- Q3 - Q1
+      
+      # Set lower and upper bounds
+      lower_bound <- Q1 - 1.5 * IQR_value
+      upper_bound <- Q3 + 1.5 * IQR_value
+      
+      # Remove rows where the value in this column is an outlier
+      df <- df[df[[col]] >= lower_bound & df[[col]] <= upper_bound, ]
+    }
+  }
+  return(df)
+}
+
+# Remove the outlier in completed dataset 
+money_ball <- remove_outliers_df(completed_data)
+# Visualize the distribution 
+par(mfrow=c(3,3)) 
+for (i in 1:17) {
+  hist(money_ball[,i],main=names(money_ball[i]),xlab=names(money_ball[i]),breaks = 51)
+  boxplot(money_ball[,i], main=names(money_ball[i]), type="l",horizontal = TRUE)
+  
+  plot(money_ball[,i], money_ball$TARGET_WINS, main = names(money_ball[i]), xlab=names(money_ball[i]))
+  abline(lm(money_ball$TARGET_WINS ~ money_ball[,i], data = money_ball), col = "blue")
+  
+}
+
+# see how the density plot shows distribution 
+melt(money_ball) %>% ggplot(aes(x= value)) +
+  geom_density(fill='red') + facet_wrap(~variable, scales = 'free')
+
+```
+
+
+
+
+The density plot shows how the values of each variable are distributed across the range. Peaks in the density curve indicate where values are concentrated, while troughs represent areas with fewer observations. After removing outliers, let see if there is an improved correlation among the variables. 
+
+
+```{r}
+
+
+# Example usage
+corre_updated_results <- calculate_correlations_with_pvalues(money_ball, "TARGET_WINS")
+
+# View the results
+print(corre_updated_results)
+
+
+```
+
+
+We improve p-values for most of the variables, but the correlation didn't improved among the variables. As we notice the previous correlation without transformation didn't show sign of good relationship among the target variables. 
+
+
+
+
+
+## Model Development 
+
+we are going to build 4 different models  and assess them based on the residual analysis. The Residual Chart contains four diagnostic plots from a multiple linear regression analysis. These plots help assess the validity of the model by checking assumptions and identifying potential issues. Here’s what each plot represents:
+
+### 1. **Residuals vs Fitted (Top Left)**
+   - **Purpose**: This plot checks the linearity assumption and homoscedasticity (constant variance of residuals).
+   - **Interpretation**: Ideally, residuals should be randomly scattered around 0, with no discernible pattern. In this plot, if you observe a pattern (such as a curve or a funnel shape), it could indicate non-linearity or heteroscedasticity. Your plot shows a relatively random scatter, which suggests the linearity assumption is reasonable.
+
+### 2. **Normal Q-Q (Top Right)**
+   - **Purpose**: This plot tests whether the residuals are normally distributed.
+   - **Interpretation**: If residuals are normally distributed, the points should lie approximately on the diagonal line. Deviations from this line, especially in the tails, suggest deviations from normality. In this plot, the points mostly follow the line, with some deviation at the extremes, indicating minor non-normality.
+
+### 3. **Scale-Location (Bottom Left)**
+   - **Purpose**: This plot, also known as a Spread-Location plot, checks for homoscedasticity (equal spread of residuals).
+   - **Interpretation**: The residuals should display a random scatter across the range of fitted values. A funnel shape (either widening or narrowing) indicates heteroscedasticity. In this plot, the spread appears fairly constant, suggesting no major issues with homoscedasticity.
+
+### 4. **Residuals vs Leverage (Bottom Right)**
+   - **Purpose**: This plot helps detect influential points that might disproportionately affect the regression model.
+   - **Interpretation**: Points with high leverage or high Cook's distance (indicated by dashed red lines) could be problematic. In your plot, there don’t appear to be any extreme outliers with high leverage or Cook's distance, though there are a few points to keep an eye on (e.g., observation 1890).
+
+### **Overall Analysis**
+- The diagnostics suggest that the regression model mostly satisfies the assumptions of linearity, normality of residuals, and homoscedasticity, with some minor deviations. There don't seem to be any overly influential points that require immediate attention.
+
+
+
+```{r}
+# Initiate the model
+model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B, TEAM_BATTING_3B+
+              TEAM_BATTING_HR+TEAM_BATTING_BB+TEAM_BATTING_SO+TEAM_BASERUN_SB,
+            data = money_ball)
+# Summarize the model 
+
+summary(model)
+
+# Model 1 evaluation
+mse <- mean(model$residuals^2)
+r_squared <- summary(model)$r.squared
+f_stat <- summary(model)$fstatistic[1]
+print(paste("MSE:", mse, "R-squared:", r_squared, "F-statistic:", f_stat))
+predictions <- predict(model, newdata = money_ball_eval)
+head(predictions)
+
+par(mfrow=c(2,2)) 
+plot(model)
+
+
+```
+
+
+
+
+The model explains 28.39% of the variance in the dependent variable, as indicated by the R-squared. The adjusted R-squared, at 28.07%, confirms that the predictors in the model are meaningful.
+The F-statistic (89.98) is large, and the p-value (< 2.2e-16) is very small, suggesting that the model is statistically significant overall, meaning that at least one predictor significantly contributes to explaining the dependent variable.
+
+
+```{r}
+
+# Ensure there are no missing values in both predictors and the target
+df_complete <- money_ball[complete.cases(money_ball), ]
+
+
+# Separate the predictors and target (assuming 'target' is the target column)
+df_predictors <- df_complete[, -which(names(df_complete) == "TARGET_WINS")]
+target <- df_complete$TARGET_WINS  # Target variable
+
+# Standardize the predictors (without the target column)
+df_standardized <- scale(df_predictors)
+# Perform PCA
+pca_model <- prcomp(df_standardized, center = TRUE, scale. = TRUE)
+
+# Create a data frame from the principal components
+df_pca <- as.data.frame(pca_model$x)
+
+# Ensure that PCA dataframe has the same number of rows as the original data
+
+# Perform PCA
+pca_model <- prcomp(df_standardized, center = TRUE, scale. = TRUE)
+
+# Create a data frame from the principal components
+df_pca <- as.data.frame(pca_model$x)
+
+# Ensure that PCA dataframe has the same number of rows as the original data
+
+
+# Add target variable to the PCA dataframe
+df_pca$TARGET_WINS <- target
+
+
+
+# Fit linear regression model using the first few principal components
+# Fit linear regression model using the first few principal components
+model1 <- lm(TARGET_WINS ~ PC1 + PC2 + PC3 + PC4+ PC5 + PC6+ PC7 + PC8, data = df_pca)
+
+# View the summary of the model
+summary(model1)
+
+mse1 <- mean(model1$residuals^2)
+r_squared1 <- summary(model1)$r.squared
+f_stat1 <- summary(model1)$fstatistic[1]
+print(paste("MSE:", mse1, "R-squared:", r_squared1, "F-statistic:", f_stat1))
+predictions1 <- predict(pca_model, newdata = money_ball_eval)
+head(predictions1)
+
+
+
+
+par(mfrow=c(2,2)) 
+plot(model1)
+
+```
+
+
+
+
+**MODEL 3 Analysis**
+
+The residuals (differences between observed and predicted values) range from a minimum of -39.526 to a maximum of 35.287. The distribution of residuals, with a median close to 0 (0.230), suggests that the model has a reasonable balance of over- and under-predictions. The first quartile (1Q) is -7.712, and the third quartile (3Q) is 8.028, indicating that half of the residuals lie between these values, meaning that most predictions deviate from the actual values by around ±8 units.
+
+Overall, the regression model is statistically significant, but it explains only about 23.58% of the variance in the dependent variable, indicating that other variables not included in the model might be influencing the outcome. Among the predictors, PC2, PC4, PC7, and PC8 show strong significant effects, while PC1 and PC5 are not significant contributors to the model. The residuals appear to be moderately dispersed around the predicted values, and the significant predictors provide meaningful insights into the relationships within the data.
+
+
+**MODEL 3 Development**
+
+
+
+```{r}
+
+
+set.seed(123)
+
+# Assuming money_ball_train is your dataset
+trainIndex <- createDataPartition(money_ball$TARGET_WINS, p = 0.8, 
+                                  list = FALSE)
+train_data <- money_ball
+test_data <- money_ball_eval
+
+
+
+control <- trainControl(method = "cv", number = 5)  # 5-fold cross-validation
+
+#Train the model (linear regression in this case)
+model3 <- train(TARGET_WINS ~ ., 
+               data = train_data, 
+               method = "lm", 
+               trControl = control)
+
+# Summary of the cross-validation results
+print(model3)
+print(model3$results)
+
+mse3 <- mean(model3$residuals^2)
+r_squared3 <- summary(model3)$r.squared
+f_stat3 <- summary(model3)$fstatistic[1]
+print(paste("MSE:", mse3, "R-squared:", r_squared3, "F-statistic:", f_stat3))
+predictions3 <- predict(model3, newdata = money_ball_eval)
+head(predictions3)
+
+
+```
+
+
+This linear regression model performs reasonably well, explaining about 37% of the variance in the target variable and providing a moderate level of accuracy. While the error metrics (RMSE, MAE) indicate that the model is making reasonable predictions, the relatively low R-squared suggests that there is room for improvement, possibly by adding more predictors or using more sophisticated models that can capture non-linear patterns.
+
+
+```{r}
+# Summary of the cross-validation results
+model3$resample
+library(ggplot2)
+library(reshape2) # for melt function
+
+# Sample data
+data <- data.frame(
+  RMSE = c(10.211374, 9.748915, 10.693919, 10.120101, 10.037255),
+  Rsquared = c(0.3975036, 0.4376530, 0.3577975, 0.3476137, 0.3151282),
+  MAE = c(8.068065, 7.832611, 8.377911, 8.179323, 8.261450),
+  Resample = c('Fold1', 'Fold2', 'Fold3', 'Fold4', 'Fold5')
+)
+
+# Melt data for ggplot
+data_melted <- melt(data, id.vars = 'Resample')
+
+# Plot
+ggplot(data_melted, aes(x = Resample, y = value, color = variable, group = variable)) +
+  geom_line() +
+  geom_point() +
+  labs(y = "Metric Value", title = "Metrics Across Folds") +
+  theme_minimal()
+
+# Faceted plot
+ggplot(data_melted, aes(x = Resample, y = value)) +
+  geom_bar(stat = 'identity') +
+  facet_wrap(~variable, scales = 'free_y') +
+  labs(y = "Metric Value", title = "Metrics Across Folds") +
+  theme_minimal()
+ 
+```
+
+
+
+The model’s performance varies slightly across folds, with Fold2 showing the best RMSE and R-squared values and a relatively low MAE. Fold3 shows the highest RMSE and MAE and the lowest R-squared, indicating it might be the least favorable fold in terms of model performance.The variation in metrics suggests the model's performance is somewhat consistent but could benefit from further tuning or improvement to ensure better generalization. 
+
+
+Based on the comparison of R-squared, RMSE/MSE, and F-statistic, Model 3 appears to be the best model overall. It has the highest R-squared (0.37), meaning it explains more variance, and its RMSE (10.31) is competitive. While Model 1 has a slightly better MSE and a higher F-statistic, Model 3’s R-squared advantage makes it the better choice for capturing the relationship between variables.
