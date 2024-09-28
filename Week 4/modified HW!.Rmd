@@ -1,10 +1,12 @@
 ---
-title: 'Homework 1 Data 621'
-author: "....."
-date: "2024-09-28"
+title: 'Homework #1 Assignment Requirements'
+author: "Warner Alexis"
+date: "2024-09-17"
 output:
   html_document: default
-  pdf_document: default
+  pdf_document:
+    toc: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -121,7 +123,7 @@ money <- money_ball_train
 
 # Create missing data flags
 #missing_flag <- ifelse(is.na(money_ball_train$TEAM_BATTING_HBP), 1, 2)
-#money_ball_train$missing_flag <- missing_flag (see below)
+#money_ball_train$missing_flag <- missing_flag
 
 
 par(mfrow=c(3,3)) 
@@ -205,20 +207,6 @@ We have about 9% of the data missing that spread out to
 > TEAM_BASERUN_CS 12.57%
 > TEAM_BATTING_HBP 91.61%
 
-### Create flags to suggest if a variable was missing
-
-To allow the model to identify whether missing values themselves have predictive power regarding the outcome variable, I created binary flags for missing values in columns with missing data.
-
-```{r}
-money_ball_train <- money_ball_train %>%
-  mutate(
-    pitching_so_missing = ifelse(is.na(TEAM_PITCHING_SO), 1, 0),
-    batting_so_missing = ifelse(is.na(TEAM_BATTING_SO), 1, 0),
-    baserun_sb_missing = ifelse(is.na(TEAM_BASERUN_SB), 1, 0),
-    baserun_cs_missing = ifelse(is.na(TEAM_BASERUN_CS), 1, 0),
-    batting_hbp_missing = ifelse(is.na(TEAM_BATTING_HBP), 1, 0)
-  )
-```
 
 **Why Use Predictive Imputation?**
 
@@ -531,155 +519,56 @@ The model’s performance varies slightly across folds, with Fold2 showing the b
 
 Based on the comparison of R-squared, RMSE/MSE, and F-statistic, Model 3 appears to be the best model overall. It has the highest R-squared (0.37), meaning it explains more variance, and its RMSE (10.31) is competitive. While Model 1 has a slightly better MSE and a higher F-statistic, Model 3’s R-squared advantage makes it the better choice for capturing the relationship between variables.
 
+## Additional model (modified version of model development)
 
-- - - - - - - - - - - - - - - -  - - -- - - - - - - - - - - - 
-
-SOULEYMANE 
-
-## Log Transformation
-
-```{r Log_Transformation}
-# Log transform on selected variables, excluding TEAM_BATTING_HBP
-money_ball_log <- money_ball %>%
-  mutate(
-    log_TEAM_BATTING_H = log(TEAM_BATTING_H + 1),
-    log_TEAM_BATTING_2B = log(TEAM_BATTING_2B + 1),
-    log_TEAM_BATTING_3B = log(TEAM_BATTING_3B + 1),
-    log_TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1),
-    log_TEAM_BATTING_BB = log(TEAM_BATTING_BB + 1),
-    log_TEAM_PITCHING_H = log(TEAM_PITCHING_H + 1),
-    log_TEAM_PITCHING_BB = log(TEAM_PITCHING_BB + 1),
-    log_TEAM_FIELDING_E = log(TEAM_FIELDING_E + 1)
-  )
-
-# Fit a linear regression model using log-transformed variables
-model_log <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_2B + 
-                log_TEAM_BATTING_3B + log_TEAM_BATTING_HR + 
-                log_TEAM_BATTING_BB + TEAM_BATTING_SO + 
-                TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
-                log_TEAM_PITCHING_H + log_TEAM_PITCHING_BB + TEAM_PITCHING_HR + 
-                TEAM_PITCHING_SO + log_TEAM_FIELDING_E + TEAM_FIELDING_DP,
-                data = money_ball_log)
-
-# Model summary
-summary(model_log)
-
+```{r}
+model <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
+              TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
+              TEAM_BASERUN_SB + TEAM_BASERUN_CS + TEAM_FIELDING_E +
+              TEAM_FIELDING_DP + TEAM_PITCHING_BB + TEAM_PITCHING_H +
+              TEAM_PITCHING_HR + TEAM_PITCHING_SO, data = money_ball)
+summary(model)
 ```
 
-## Square Root Transformation 
-```{r Square_Root_Transformation}
-# Square root transform on selected variables, excluding TEAM_BATTING_HBP
-money_ball_sqrt <- money_ball %>%
-  mutate(
-    sqrt_TEAM_BATTING_H = sqrt(TEAM_BATTING_H),
-    sqrt_TEAM_BATTING_2B = sqrt(TEAM_BATTING_2B),
-    sqrt_TEAM_BATTING_3B = sqrt(TEAM_BATTING_3B),
-    sqrt_TEAM_BATTING_HR = sqrt(TEAM_BATTING_HR),
-    sqrt_TEAM_BATTING_BB = sqrt(TEAM_BATTING_BB),
-    sqrt_TEAM_PITCHING_H = sqrt(TEAM_PITCHING_H),
-    sqrt_TEAM_PITCHING_BB = sqrt(TEAM_PITCHING_BB),
-    sqrt_TEAM_FIELDING_E = sqrt(TEAM_FIELDING_E)
-  )
+**Residuals:** The distribution of residuals suggests that most of the predictions are relatively close to the actual values, though there are some larger residuals, indicated by the minimum and maximum values (-31.16 and 33.07).
 
-# Fit a linear regression model using square root-transformed variables
-model_sqrt <- lm(TARGET_WINS ~ sqrt_TEAM_BATTING_H + sqrt_TEAM_BATTING_2B + 
-                 sqrt_TEAM_BATTING_3B + sqrt_TEAM_BATTING_HR + 
-                 sqrt_TEAM_BATTING_BB + TEAM_BATTING_SO + 
-                 TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
-                 sqrt_TEAM_PITCHING_H + sqrt_TEAM_PITCHING_BB + TEAM_PITCHING_HR + 
-                 TEAM_PITCHING_SO + sqrt_TEAM_FIELDING_E + TEAM_FIELDING_DP,
-                 data = money_ball_sqrt)
+The R-squared value is 0.3882, meaning that about 38.82% of the variation in TARGET_WINS is explained by the model. This suggests a moderate fit, but a large portion of the variance remains unexplained.
+The adjusted R-squared (0.3826) is slightly lower, which accounts for the number of predictors in the model.
 
-# Model summary
-summary(model_sqrt)
+**Residuals vs Fitted (Top Left)** the residuals are mostly centered around 0, but there's a slight funnel shape, which suggests non-constant variance. This could indicate that the model might not be capturing the variance properly across the range of fitted values.
 
+**Q-Q Plot (Top Right)**  the points mostly follow the line, but there are some deviations at the tails. This suggests that the residuals are mostly normally distributed, but there may be some slight skewness.
 
+**Scale-Location (Bottom Left)** the spread seems fairly even but with a slight upward curve, suggesting mild non-constant variance.
+
+**Residuals vs Leverage (Bottom Right)** 
+
+Residual Analysis:
+
+```{r}
+par(mfrow=c(2,2))
+plot(model)
 ```
 
-## Interaction Terms
-```{r Interaction_Terms}
-# Interaction terms between batting and pitching stats
-money_ball_interaction <- money_ball %>%
-  mutate(
-    interaction_HR_BB = TEAM_BATTING_HR * TEAM_BATTING_BB,
-    interaction_Pitching_HR_BB = TEAM_PITCHING_HR * TEAM_PITCHING_BB,
-    interaction_Fielding_E_DP = TEAM_FIELDING_E * TEAM_FIELDING_DP
-  )
+**Residuals vs Fitted (Top Left)** the residuals are mostly centered around 0, but there's a slight funnel shape, which suggests non-constant variance. This could indicate that the model might not be capturing the variance properly across the range of fitted values.
 
-# Fit a linear regression model with interaction terms
-model_interaction <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
-                        TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO +
-                        TEAM_BASERUN_SB + TEAM_BASERUN_CS +
-                        TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO +
-                        TEAM_FIELDING_E + TEAM_FIELDING_DP +
-                        interaction_HR_BB + interaction_Pitching_HR_BB + interaction_Fielding_E_DP,
-                      data = money_ball_interaction)
+**Q-Q Plot (Top Right)**  the points mostly follow the line, but there are some deviations at the tails. This suggests that the residuals are mostly normally distributed, but there may be some slight skewness.
 
-# Model summary
-summary(model_interaction)
+**Scale-Location (Bottom Left)** the spread seems fairly even but with a slight upward curve, suggesting mild non-constant variance.
 
+**Residuals vs Leverage (Bottom Right)** 
+
+Comparing models
+
+```{r}
+model1 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B, data = money_ball)
+model2 <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_HR, data = money_ball)
+
+# Compare models using AIC
+AIC(model1, model2)
+
+# Compare models using R-squared
+summary(model1)$r.squared
+summary(model2)$r.squared
 ```
-
-## Removing Outliers
-
-```{r Removing_Outliers}
-# Function to remove outliers based on IQR method
-remove_outliers <- function(df, cols) {
-  for (col in cols) {
-    Q1 <- quantile(df[[col]], 0.25, na.rm = TRUE)
-    Q3 <- quantile(df[[col]], 0.75, na.rm = TRUE)
-    IQR_value <- Q3 - Q1
-    lower_bound <- Q1 - 1.5 * IQR_value
-    upper_bound <- Q3 + 1.5 * IQR_value
-    df <- df[df[[col]] >= lower_bound & df[[col]] <= upper_bound, ]
-  }
-  return(df)
-}
-
-# Remove outliers from relevant columns, excluding TEAM_BATTING_HBP
-money_ball_no_outliers <- remove_outliers(money_ball, 
-  c("TEAM_BATTING_H", "TEAM_BATTING_HR", "TEAM_BATTING_BB", 
-    "TEAM_PITCHING_H", "TEAM_PITCHING_HR", "TEAM_PITCHING_BB", 
-    "TEAM_FIELDING_E"))
-
-# Fit a linear regression model without outliers
-model_no_outliers <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
-                          TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO + 
-                          TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
-                          TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO +
-                          TEAM_FIELDING_E + TEAM_FIELDING_DP,
-                        data = money_ball_no_outliers)
-
-# Model summary
-summary(model_no_outliers)
-```
-
-## Outlier Removal and Interaction Terms Model
-
-```{r Outlier_Removal_and_Interaction_Terms_Model}
-# Remove outliers based on IQR for key variables
-money_ball_clean <- money_ball %>%
-  filter(
-    between(TEAM_BATTING_HR, quantile(TEAM_BATTING_HR, 0.25) - 1.5*IQR(TEAM_BATTING_HR), quantile(TEAM_BATTING_HR, 0.75) + 1.5*IQR(TEAM_BATTING_HR)),
-    between(TEAM_PITCHING_BB, quantile(TEAM_PITCHING_BB, 0.25) - 1.5*IQR(TEAM_PITCHING_BB), quantile(TEAM_PITCHING_BB, 0.75) + 1.5*IQR(TEAM_PITCHING_BB))
-  )
-
-# Create interaction terms for batting and pitching stats
-money_ball_interaction <- money_ball_clean %>%
-  mutate(
-    interaction_BATTING = TEAM_BATTING_HR * TEAM_BATTING_BB,
-    interaction_PITCHING = TEAM_PITCHING_H * TEAM_PITCHING_BB
-  )
-
-# Fit a linear regression model with interaction terms
-model_interaction <- lm(TARGET_WINS ~ interaction_BATTING + interaction_PITCHING +
-                        TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + 
-                        TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
-                        TEAM_PITCHING_HR + TEAM_PITCHING_SO + 
-                        TEAM_FIELDING_DP + TEAM_FIELDING_E,
-                        data = money_ball_interaction)
-
-# Model summary
-summary(model_interaction)
-```
-
+Based on the AIC, Model 2 is the preferred model, as it has a lower AIC and thus a better balance between fit and complexity. The R-squared emphasizes that; model 2 a higher R-squared value, meaning it explains a greater proportion of the variance in the dependent variable (TARGET_WINS) compared to Model 1.
