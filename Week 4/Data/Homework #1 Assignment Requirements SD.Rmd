@@ -762,4 +762,4 @@ For selecting the best multiple linear regression model, we would focus on a bal
 
 - F-statistics: The "Outlier Removal and Interaction Terms" model has an F-statistic of 80.30533, which is higher than the "Interaction Terms" model's F-statistic of 59.05871. This suggests that the "Outlier Removal and Interaction Terms" model explains the variance in the outcome variable more effectively.
 
-In conclusion, while both models have their merits, the "Outlier Removal and Interaction Terms" model effectively balances performance and interpretability, making it the preferred choice for reliable insights.
+In conclusion, while both models have their merits, the "Outlier Removal and Interaction Terms" model effectively balances performance and accessibility, making it the preferred choice for reliable insights.
