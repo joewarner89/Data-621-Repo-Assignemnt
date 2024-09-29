@@ -1,6 +1,6 @@
 ---
 title: 'Homework 1 Data 621'
-author: "....."
+author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-09-28"
 output:
   html_document: default
@@ -754,7 +754,7 @@ Given the evaluations, we recommend the "Outlier Removal and Interaction Terms" 
 
 ## Select Models:
 
-For selecting the best multiple linear regression model, I would focus on a balance between performance and simplicity (parsimony). Let's analyze the "Outlier Removal and Interaction Terms" model and the "Interaction Terms" model based on each criterion:
+For selecting the best multiple linear regression model, we would focus on a balance between performance and simplicity (parsimony). Let's analyze the "Outlier Removal and Interaction Terms" model and the "Interaction Terms" model based on each criterion:
 
 - Performance vs. Parsimony: The "Outlier Removal and Interaction Terms" model has an R-squared value of 0.3894 and an Adjusted R-squared of 0.3846, indicating it explains a significant portion of the variance. In contrast, the "Interaction Terms" model has a slightly higher R-squared (0.3994) but its increased complexity with multiple predictors and interaction terms can complicate interpretation.
 
