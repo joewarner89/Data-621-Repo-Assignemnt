@@ -3,7 +3,6 @@ title: 'Homework 1 Data 621'
 author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-09-28"
 output:
-  html_document: default
   pdf_document: default
 ---
 
