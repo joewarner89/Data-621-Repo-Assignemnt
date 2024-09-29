@@ -517,13 +517,6 @@ The model’s performance varies slightly across folds, with Fold2 showing the b
 
 Based on the comparison of R-squared, RMSE/MSE, and F-statistic, Model 3 appears to be the best model overall. It has the highest R-squared (0.37), meaning it explains more variance, and its RMSE (10.31) is competitive. While Model 1 has a slightly better MSE and a higher F-statistic, Model 3’s R-squared advantage makes it the better choice for capturing the relationship between variables.
 
-
-- - - - - - - - - - - - - - - -  - - -- - - - - - - - - - - - 
-
-
-
-# SOULEYMANE 
-
 ## Log Transformation
 
 ```{r Log_Transformation}
@@ -554,6 +547,7 @@ model_log <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_2B +
 ```
 
 ## Square Root Transformation 
+
 ```{r Square_Root_Transformation}
 # Square root transform on selected variables, excluding TEAM_BATTING_HBP
 money_ball_sqrt <- money_ball %>%
@@ -582,6 +576,7 @@ model_sqrt <- lm(TARGET_WINS ~ sqrt_TEAM_BATTING_H + sqrt_TEAM_BATTING_2B +
 ```
 
 ## Interaction Terms
+
 ```{r Interaction_Terms}
 # Interaction terms between batting and pitching stats
 money_ball_interaction_outlier <- money_ball %>%
@@ -606,6 +601,7 @@ model_interaction_outlier <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B +
 ```
 
 ## Removing Outliers
+
 ```{r Removing_Outliers}
 # Function to remove outliers based on IQR method
 remove_outliers <- function(df, cols) {
@@ -639,6 +635,7 @@ model_no_outliers <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BA
 ```
 
 ## Outlier Removal and Interaction Terms Model
+
 ```{r Outlier_Removal_and_Interaction_Terms_Model}
 # Remove outliers based on IQR for key variables
 money_ball_clean <- money_ball %>%
@@ -667,6 +664,7 @@ model_interaction_no_outlier <- lm(TARGET_WINS ~ interaction_BATTING + interacti
 ```
 
 ## Model Evaluation Function
+
 ```{r Model_Evaluation_Function}
 ## Model Evaluation Function
 evaluate_model <- function(model, data) {
@@ -711,25 +709,57 @@ evaluate_model <- function(model, data) {
 
 
 ### Log Ttansformation model Evaluation
+
 ```{r Log_Ttansformation_model_Evaluation}
 evaluation_log <- evaluate_model(model_log, money_ball_log)
 ```
 
 ### Square Root Transformation Model Evaluation
+
 ```{r Square_Root_Transformation_Model_Evaluation}
 evaluation_sqrt <- evaluate_model(model_sqrt, money_ball_sqrt)
 ```
 
 ### Interaction Terms Model Evaluation
+
 ```{r}
 evaluation_Interaction_outlier <- evaluate_model(model_interaction_outlier, money_ball_interaction_outlier)
 ```
+
 ### Removing Outliers Model Evaluation
+
 ```{r Removing_Outliers_Model_Evaluation}
 evaluation_no_outliers <- evaluate_model(model_no_outliers, money_ball_no_outliers)
 ```
+
 ### Outlier Removal and Interaction Terms Model Evaluation
+
 ```{r Outlier_Removal_and_Interaction_Terms_Model_Evaluation}
 evaluation_interaction_no_outlier <- evaluate_model(model_interaction_no_outlier, money_ball_interaction_no_outlier)
 ```
 
+
+
+### Are you keeping the model even though it is counter intuitive? Why? The boss needs to know.
+
+Based on the models we have seen, the following variables have coefficients that make sense are the following:
+
+- TEAM_BATTING_H (Hits): Positive coefficients across models indicate that more hits lead to more wins, which is expected because hits create scoring opportunities.
+
+- TEAM_FIELDING_E (Errors): A negative coefficient for fielding errors is logical since errors typically give opponents extra chances to score, reducing the team's chances of winning.
+
+- TEAM_BASERUN_SB (Stolen Bases): The positive effect on wins is also intuitive, as successful base stealing increases scoring potential.
+
+Despite the counter intuitive nature of keeping the model, I recommend maintaining the "Removing Outliers" model due to its superior performance metrics. This model has the highest R-squared (0.3889) and Adjusted R-squared (0.3831), indicating it explains a significant portion of the variance in the data. Its Mean Squared Error (MSE) of 98.4005 and Root Mean Squared Error (RMSE) of 9.9197 are also the lowest among the models evaluated, suggesting better predictive accuracy. Although the model with interaction terms yielded a slightly higher R-squared (0.3874), its complexity may lead to overfitting and make it less interpretable. Thus, focusing on the model that effectively balances performance and simplicity will provide more reliable insights for decision-making.
+
+## Select Models:
+
+For selecting the best multiple linear regression model, I would focus on a balance between performance and simplicity (parsimony). Let's analyze the "Removing Outliers" model and the "Interaction Terms" model based on each criterion:
+
+- Performance vs. Parsimony: The "Removing Outliers" model has the highest R-squared value (0.3889) and Adjusted R-squared (0.3831) among all models, indicating it explains a significant portion of the variance. In contrast, the "Interaction Terms" model has a slightly lower R-squared (0.3874) but includes multiple predictors and interaction terms, which can complicate interpretation.
+
+- Mean Squared Error (MSE): The "Removing Outliers" model has a lower MSE (98.4005) compared to the "Interaction Terms" model (100.182), suggesting better predictive accuracy.
+
+- F-statistics: The "Removing Outliers" model has an F-statistic of 67.90224, while the "Interaction Terms" model has an F-statistic of 57.72305. A higher F-statistic in the "Removing Outliers" model indicates that it explains the variance in the outcome variable more effectively.
+
+In conclusion, while both models have their merits, the "Removing Outliers" model balances performance and simplicity, making it the preferred choice for reliable insights.
