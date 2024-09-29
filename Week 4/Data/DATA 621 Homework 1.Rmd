@@ -1,0 +1,1155 @@
+---
+title: "DATA 621 Homework 1"
+author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
+date: "2024-14-03"
+output:
+  html_document: default
+  pdf_document:
+    latex_engine: xelatex
+---
+
+{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+
+Load Required Libraries
+```{r}
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+# Function to install a package if not already installed
+install_if_needed <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+
+  }
+}
+
+# List of packages to check and install if necessary
+required_packages <- c("dplyr", "ggplot2", "lubridate", "tidyr", 
+                       "caret", "stats", "tidyverse", "corrplot",
+                       "plotly", "DT", "DataExplorer", "mice", "kableExtra",
+                       "reshape", "reshape2", "factoextra", "psych", "GGally", "tinytex"
+)
+
+# Loop through the list and install packages only if needed
+for (pkg in required_packages) {
+  install_if_needed(pkg)
+}
+
+# Function to suppress package startup messages
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(tidyr)
+  library(caret) # for data splitting and pre-processing
+  library(stats)
+  library(tidyverse)
+  library(corrplot)
+  library(plotly)
+  library(DT)
+  
+  library(DataExplorer)
+  library(mice)
+  library(kableExtra)
+  library(reshape)
+  library(reshape2)
+  library(factoextra)
+  library(psych)
+  library(GGally)
+  library(tinytex)
+})
+
+
+```
+
+### 1.Modeling Assumptions
+  - **Linearity:** The mean values of the outcome variable TARGET_WINS for each increment of the predictor(s) lie on a strainght line. There is a linear relationship between predictors and the target.
+  - **Linearity:** There exist a relationship between the independent variables and the dependent variable TARGET_WINS.
+  - **Independence:** The residuals are independent. 
+  - **Homoscedasticity:** At each level of the predictor variables, the variance of the residual terms are constant.
+  - **Independence:** All the values of the dependent variable are independent.
+    **Normally distributed errors:** The residuals are random, normally distributed with a mean 0.
+
+### 2. Data Exploration
+
+Import the dataset
+
+```{r}
+money_ball_train = read_csv("https://raw.githubusercontent.com/hawa1983/DATA-621/main/moneyball-training-data.csv", show_col_types = FALSE)
+money_ball_evaluate = read_csv("https://raw.githubusercontent.com/hawa1983/DATA-621/main/moneyball-evaluation-data.csv", show_col_types = FALSE)
+str(money_ball_train)
+str(money_ball_evaluate)
+```
+#### i. Summarise the data
+
+Get an overview of the data through summary statistics like mean, median, and standard deviation.
+```{r}
+# Load necessary libraries
+library(psych)
+
+# Summary statistics
+summary_stats <- summary(money_ball_train)
+
+# Descriptive statistics
+descriptive_stats <- describe(money_ball_train)
+
+descriptive_stats
+```
+
+#### ii. Visualize the data for feature distributions, relationships and outlier Detection
+
+ - 1. **Distribution Analysis:** Plot histograms to understand the distribution of each variable.
+ - 2. **Box Plots:** Create box plots to detect outliers and understand the distribution of each variable.
+ - 3. **Bivariate Analysis:** Examine relationships between the target variable and independent variables.
+
+```{r}
+par(mfrow = c(3, 3))  # Set up the plotting area for multiple plots
+
+# List of column names to analyze
+columns_to_analyze <- c("TEAM_BATTING_H", "TEAM_BATTING_2B", "TEAM_BATTING_3B", 
+                        "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BATTING_SO", 
+                        "TEAM_BASERUN_SB", "TEAM_BASERUN_CS", "TEAM_BATTING_HBP", 
+                        "TEAM_PITCHING_H", "TEAM_PITCHING_HR", "TEAM_PITCHING_BB", 
+                        "TEAM_PITCHING_SO", "TEAM_FIELDING_E", "TEAM_FIELDING_DP")
+
+# Loop through each specified column name
+for (column_name in columns_to_analyze) {
+  column_data <- money_ball_train[[column_name]]  # Extract column data
+  
+  # Ensure the column is numeric
+  if (is.numeric(column_data)) {
+    # Remove NAs specific to the current column and TARGET_WINS
+    valid_indices <- complete.cases(column_data, money_ball_train$TARGET_WINS)
+    clean_data <- money_ball_train[valid_indices, ]
+    
+    # Plot histogram
+    hist(clean_data[[column_name]], main = column_name, 
+         xlab = column_name, breaks = 51)
+    
+    # Plot boxplot
+    boxplot(clean_data[[column_name]], main = column_name, 
+            horizontal = TRUE)
+    
+    # Plot scatterplot and fit a regression line
+    plot(clean_data[[column_name]], clean_data$TARGET_WINS, 
+         main = column_name, 
+         xlab = column_name, 
+         ylab = "TARGET_WINS")
+    
+    # Add regression line
+    abline(lm(TARGET_WINS ~ get(column_name), data = clean_data), col = 'blue')
+  } else {
+    message("Skipping non-numeric column: ", column_name)
+  }
+}
+
+
+```
+
+Based on the summary statistics and visualizations:
+
+  - **TARGET_WINS:** The mean and median are close, indicating symmetry. The spread of the data (from minimum to maximum) does not show extreme values, suggesting no significant outliers.
+  - **TEAM_BATTING_H:** The mean is slightly higher than the median, suggesting a slight positive skew. The presence of outliers is likely due to extreme values in the data.
+  - **TEAM_BATTING_2B:** The mean and median are close, suggesting symmetry. The range of data is within typical bounds, indicating no significant outliers.
+  - **TEAM_BATTING_3B:** A larger difference between the mean and median indicates positive skewness. The presence of extreme values suggests outliers.
+  - **TEAM_BATTING_HR:** A slight difference between mean and median indicates slight positive skewness. The data likely contains outliers due to extreme values.
+  - **TEAM_BATTING_BB:** Mean and median are close, indicating symmetry. The range suggests no significant outliers.
+  - **TEAM_BATTING_SO:** Slight positive skewness is indicated by a higher mean than median. The data shows the presence of outliers.
+  - **TEAM_BASERUN_SB and TEAM_BASERUN_CS:** Both show positive skewness with a higher mean than median, and the presence of outliers is suggested by extreme values in the data.
+  - **TEAM_BATTING_HBP:** Slight positive skewness is indicated by the mean being slightly higher than the median, but no extreme outliers are detected.
+  - **TEAM_PITCHING_H:** Mean and median are close, suggesting symmetry. The range of data does not suggest outliers.
+  - **TEAM_PITCHING_HR, TEAM_PITCHING_BB, TEAM_PITCHING_SO:** These show slight positive skewness (mean > median), with varying indications of outliers based on the range of data.
+  - **TEAM_FIELDING_E and TEAM_FIELDING_DP:** Both show symmetry (mean ≈ median) and no significant outliers.
+
+#### iii. Correlation Analysis
+Create a correlation matrix to identify relationships between variables.
+
+```{r}
+# Correlation matrix
+cor_matrix <- cor(money_ball_train, use = "complete.obs")
+
+# Visualize the correlation matrix
+library(corrplot)
+corrplot(cor_matrix, method = "circle", type = "upper", tl.cex = 0.8, tl.col = "black")
+
+```
+Based on the correlation matrix provided in the plot:
+
+1. **Strong Positive Correlations:**
+   - **TEAM_BATTING_H** and **TEAM_BATTING_2B**: There is a strong positive correlation between these two variables, indicating that as the number of hits increases, the number of doubles also tends to increase.
+   - **TEAM_PITCHING_H** and **TEAM_PITCHING_BB**: These two pitching-related variables are also strongly positively correlated, suggesting that teams that give up more hits also tend to issue more walks.
+   - **TEAM_PITCHING_H** and **TEAM_PITCHING_HR**: There's a notable positive correlation between the number of hits and home runs allowed by the team's pitching, indicating a relationship between general hitting success against the team and home run success.
+
+2. **Moderate Positive Correlations:**
+   - **TEAM_BATTING_HR** and **TEAM_BATTING_2B**: The number of home runs and doubles have a moderate positive correlation, which may indicate that teams with more powerful hitting overall (resulting in more home runs) also hit more doubles.
+   - **TEAM_BASERUN_SB** and **TEAM_BASERUN_CS**: Stolen bases and caught stealing are moderately correlated, indicating that teams that attempt more steals have both higher successful steals and higher times caught stealing.
+
+3. **Weak or No Correlations:**
+   - **TARGET_WINS** with most other variables shows generally weak correlations. This suggests that individual batting, baserunning, or pitching statistics alone might not be strong predictors of team wins, which is often the case because wins are influenced by a combination of factors.
+   - **TEAM_FIELDING_E** and other variables: Fielding errors do not show a strong correlation with other variables, indicating that errors may not be directly related to the batting or pitching performances.
+
+4. **Negative Correlations:**
+   - There are some weak negative correlations, but none stand out as particularly strong or meaningful in this plot. Negative correlations are generally less pronounced, and none seem to be significantly impactful in the overall dataset.
+
+#### iv. Check for missing values
+Some of the variables have missing values. 
+
+```{r}
+# Total number of rows in the dataset
+total_rows <- nrow(money_ball_train)
+
+# Check for missing values and calculate the percentage of missing values
+missing_values <- colSums(is.na(money_ball_train))
+missing_percent <- (missing_values / total_rows) * 100
+
+# Create a dataframe that includes both the count and percentage of missing values
+missing_values_df <- data.frame(
+  Column = names(missing_values),
+  Missing_Values = missing_values,
+  Percent_Missing = missing_percent
+)
+
+# Filter only columns with missing values and sort the dataframe by Missing_Values in descending order
+missing_values_df <- missing_values_df %>%
+  filter(Missing_Values > 0) %>%             # Only include columns with missing values
+  arrange(desc(Missing_Values))              # Sort by missing values
+
+# View the sorted table
+print(missing_values_df)
+```
+
+### 3. Data Preparation
+
+#### i. Impute Missing Values
+
+##### a. Imputation Methods
+The following methods will be used for missing values imputation
+
+```{r}
+# Calculate the percentage of missing values for each column
+missing_values_df <- data.frame(
+  Column = names(money_ball_train),
+  Percent_Missing = colMeans(is.na(money_ball_train)) * 100
+)
+
+# Filter only columns with missing values
+missing_values_with_na <- missing_values_df[missing_values_df$Percent_Missing > 0, ]
+
+# Apply recommendations based on missing value percentages
+missing_values_with_na$Imputation_Recommendation <- ifelse(
+  missing_values_with_na$Percent_Missing <= 5, "Mean/Median Imputation",
+  ifelse(
+    missing_values_with_na$Percent_Missing > 5 & missing_values_with_na$Percent_Missing <= 20, "KNN or Multiple Imputation",
+    ifelse(
+      missing_values_with_na$Percent_Missing > 20 & missing_values_with_na$Percent_Missing <= 50, "Multiple Imputation or Predictive Modeling",
+      "Consider Dropping or Advanced Techniques"
+    )
+  )
+)
+
+# Display the recommendations
+print(missing_values_with_na)
+
+```
+
+##### b. Perform the imputations for training data
+
+```{r}
+money_ball_train_imputed <- money_ball_train
+
+# Impute or drop based on the recommendations
+for (i in 1:nrow(missing_values_with_na)) {
+  column_name <- missing_values_with_na$Column[i]
+  recommendation <- missing_values_with_na$Imputation_Recommendation[i]
+  
+  if (recommendation == "Mean/Median Imputation") {
+    # Mean/Median Imputation
+    money_ball_train_imputed[[column_name]][is.na(money_ball_train_imputed[[column_name]])] <- 
+      median(money_ball_train_imputed[[column_name]], na.rm = TRUE)  # Or use mean if preferred
+  } else if (recommendation == "KNN or Multiple Imputation") {
+    # For simplicity, using median imputation here, but you can replace with more advanced methods like KNN
+    money_ball_train_imputed[[column_name]][is.na(money_ball_train_imputed[[column_name]])] <- 
+      median(money_ball_train_imputed[[column_name]], na.rm = TRUE)
+  } else if (recommendation == "Multiple Imputation or Predictive Modeling") {
+    # For simplicity, using median imputation here, but you can replace with more advanced methods
+    money_ball_train_imputed[[column_name]][is.na(money_ball_train_imputed[[column_name]])] <- 
+      median(money_ball_train_imputed[[column_name]], na.rm = TRUE)
+  } else if (recommendation == "Consider Dropping") {
+    # Drop the variable if recommended
+    money_ball_train_imputed[[column_name]] <- NULL
+  }
+}
+
+# Display the updated data frame
+head(money_ball_train_imputed)
+```
+
+##### c. Perform the imputations for evaluation data
+
+```{r}
+money_ball_evaluate_imputed <- money_ball_evaluate
+
+# Impute or drop based on the recommendations
+for (i in 1:nrow(missing_values_with_na)) {
+  column_name <- missing_values_with_na$Column[i]
+  recommendation <- missing_values_with_na$Imputation_Recommendation[i]
+  
+  if (recommendation == "Mean/Median Imputation") {
+    # Mean/Median Imputation
+    money_ball_evaluate_imputed[[column_name]][is.na(money_ball_evaluate_imputed[[column_name]])] <- 
+      median(money_ball_evaluate_imputed[[column_name]], na.rm = TRUE)  # Or use mean if preferred
+  } else if (recommendation == "KNN or Multiple Imputation") {
+    # For simplicity, using median imputation here, but you can replace with more advanced methods like KNN
+    money_ball_evaluate_imputed[[column_name]][is.na(money_ball_evaluate_imputed[[column_name]])] <- 
+      median(money_ball_evaluate_imputed[[column_name]], na.rm = TRUE)
+  } else if (recommendation == "Multiple Imputation or Predictive Modeling") {
+    # For simplicity, using median imputation here, but you can replace with more advanced methods
+    money_ball_evaluate_imputed[[column_name]][is.na(money_ball_evaluate_imputed[[column_name]])] <- 
+      median(money_ball_evaluate_imputed[[column_name]], na.rm = TRUE)
+  } else if (recommendation == "Consider Dropping") {
+    # Drop the variable if recommended
+    money_ball_evaluate_imputed[[column_name]] <- NULL
+  }
+}
+
+# Display the updated data frame
+head(money_ball_evaluate_imputed)
+```
+
+#### ii. Transform the data based on the summary statistic and visualizations
+Transform the data to correct skewness, non-linearity, or to stabilize variance (i.e., address heteroscedasticity).
+
+##### a. Data transformation methods
+Base on the summary statistics and visualizations, the following transformations will be applied to the data
+
+```{r}
+# Create a data frame with variables, transformation methods, and reasons
+transformation_recommendations <- data.frame(
+  Variable = c("TEAM_BATTING_H", "TEAM_BATTING_2B", "TEAM_BATTING_3B", 
+               "TEAM_BATTING_HR", "TEAM_BATTING_BB", "TEAM_BATTING_SO", 
+               "TEAM_BASERUN_SB", "TEAM_BASERUN_CS", "TEAM_BATTING_HBP", 
+               "TEAM_PITCHING_H", "TEAM_PITCHING_HR", "TEAM_PITCHING_BB", 
+               "TEAM_PITCHING_SO", "TEAM_FIELDING_E", "TEAM_FIELDING_DP"),
+  Transformation_Method = c("Logarithmic", "None", "Square Root", 
+                            "Logarithmic", "None", "Logarithmic", 
+                            "Logarithmic", "Square Root", "None", 
+                            "Logarithmic", "Logarithmic", "Logarithmic", 
+                            "Logarithmic", "Logarithmic", "None"),
+  Reason = c("The distribution appears right-skewed.",
+             "The distribution is fairly normal, and the relationship with TARGET_WINS seems linear.",
+             "The distribution is right-skewed with some extreme values.",
+             "The distribution is right-skewed.",
+             "The distribution and the relationship with TARGET_WINS are acceptable.",
+             "The distribution is right-skewed.",
+             "The distribution is highly right-skewed.",
+             "The distribution is right-skewed.",
+             "The distribution is relatively normal.",
+             "The distribution is extremely right-skewed.",
+             "The distribution is right-skewed.",
+             "The distribution is right-skewed with outliers.",
+             "The distribution is right-skewed.",
+             "The distribution is right-skewed.",
+             "The distribution is fairly normal, and the relationship with TARGET_WINS appears linear.")
+)
+
+# Display the data frame
+print(transformation_recommendations)
+
+```
+##### b. Perform the data transformations for testing data
+```{r}
+# Perform the recommended transformations
+
+money_ball_train_transformed <- money_ball_train_imputed %>%
+  mutate(
+    # Logarithmic Transformations
+    TEAM_BATTING_H = log(TEAM_BATTING_H + 1),
+    TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1),
+    TEAM_BATTING_SO = log(TEAM_BATTING_SO + 1),
+    TEAM_BASERUN_SB = log(TEAM_BASERUN_SB + 1),
+    TEAM_PITCHING_H = log(TEAM_PITCHING_H + 1),
+    TEAM_PITCHING_HR = log(TEAM_PITCHING_HR + 1),
+    TEAM_PITCHING_BB = log(TEAM_PITCHING_BB + 1),
+    TEAM_PITCHING_SO = log(TEAM_PITCHING_SO + 1),
+    TEAM_FIELDING_E = log(TEAM_FIELDING_E + 1),
+
+    # Square Root Transformations
+    TEAM_BATTING_3B = sqrt(TEAM_BATTING_3B),
+    TEAM_BASERUN_CS = sqrt(TEAM_BASERUN_CS),
+
+    # No Transformation Needed
+    TEAM_BATTING_2B = TEAM_BATTING_2B,    # No transformation
+    TEAM_BATTING_BB = TEAM_BATTING_BB,    # No transformation
+    TEAM_BATTING_HBP = TEAM_BATTING_HBP,  # No transformation
+    TEAM_FIELDING_DP = TEAM_FIELDING_DP   # No transformation
+  )
+
+# Display the updated data frame to check the first few rows
+head(money_ball_train_transformed)
+
+
+```
+
+##### c. Perform the data transformations for evaluation data
+```{r}
+# Perform the recommended transformations
+
+money_ball_evaluate_transformed <- money_ball_evaluate_imputed %>%
+  mutate(
+    # Logarithmic Transformations
+    TEAM_BATTING_H = log(TEAM_BATTING_H + 1),
+    TEAM_BATTING_HR = log(TEAM_BATTING_HR + 1),
+    TEAM_BATTING_SO = log(TEAM_BATTING_SO + 1),
+    TEAM_BASERUN_SB = log(TEAM_BASERUN_SB + 1),
+    TEAM_PITCHING_H = log(TEAM_PITCHING_H + 1),
+    TEAM_PITCHING_HR = log(TEAM_PITCHING_HR + 1),
+    TEAM_PITCHING_BB = log(TEAM_PITCHING_BB + 1),
+    TEAM_PITCHING_SO = log(TEAM_PITCHING_SO + 1),
+    TEAM_FIELDING_E = log(TEAM_FIELDING_E + 1),
+
+    # Square Root Transformations
+    TEAM_BATTING_3B = sqrt(TEAM_BATTING_3B),
+    TEAM_BASERUN_CS = sqrt(TEAM_BASERUN_CS),
+
+    # No Transformation Needed
+    TEAM_BATTING_2B = TEAM_BATTING_2B,    # No transformation
+    TEAM_BATTING_BB = TEAM_BATTING_BB,    # No transformation
+    TEAM_BATTING_HBP = TEAM_BATTING_HBP,  # No transformation
+    TEAM_FIELDING_DP = TEAM_FIELDING_DP   # No transformation
+  )
+
+# Display the updated data frame to check the first few rows
+head(money_ball_evaluate_transformed)
+
+
+```
+
+#### iii. Scale the variables
+
+##### a. Scale the variables for training data
+Scaling is to ensure that all features have the same scale.
+
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_transformed)), names(money_ball_train_transformed))
+
+
+# Drop the INDEX and TEAM_BATTING_HBP columns
+money_ball_train_transformed <- money_ball_train_transformed[, -c(column_indexes["INDEX"], column_indexes["TEAM_BATTING_HBP"])]
+
+# Min-Max scaling function
+min_max_scale <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+# Apply Min-Max scaling to all numeric columns in the dataset
+money_ball_train_scaled <- money_ball_train_transformed %>% 
+  mutate(across(everything(), min_max_scale))
+
+# Display the first few rows of the scaled dataset
+head(money_ball_train_scaled)
+
+
+```
+
+##### b. Scale the variables for evaluation data
+Scaling is to ensure that all features have the same scale.
+
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_transformed)), names(money_ball_evaluate_transformed))
+
+
+# Drop the INDEX and TEAM_BATTING_HBP columns
+money_ball_evaluate_transformed <- money_ball_evaluate_transformed[, -c(column_indexes["INDEX"], column_indexes["TEAM_BATTING_HBP"])]
+
+# Min-Max scaling function
+min_max_scale <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+# Apply Min-Max scaling to all numeric columns in the dataset
+money_ball_evaluate_scaled <- money_ball_evaluate_transformed %>% 
+  mutate(across(everything(), min_max_scale))
+
+# Display the first few rows of the scaled dataset
+head(money_ball_evaluate_scaled)
+
+
+```
+
+### 4. Check for Multicollinearity
+
+Check for multicollinearity among independent variables.
+
+```{r}
+# Load necessary library
+library(car)
+
+# Calculate VIF values
+vif_values <- vif(lm(TARGET_WINS ~ ., data = money_ball_train_scaled))
+
+# Convert VIF values into a data frame
+vif_df <- data.frame(
+  Variable = names(vif_values),
+  VIF = vif_values
+)
+
+# Sort the data frame by VIF in descending order
+vif_df <- vif_df[order(-vif_df$VIF), ]
+
+# Display the sorted data frame
+print(vif_df)
+
+
+
+```
+
+Based on the Variance Inflation Factor (VIF) values above,  there is a presence of severe multicollinearity in the dataset, with some variables. Here's the breakdown:
+
+- **Variables with high multicollinearity: ** The VIF in `TEAM_BATTING_H` (VIF = 119,071.0), `TEAM_BATTING_BB` (VIF = 196,285.5), `TEAM_PITCHING_HR` (VIF = 308,757.4), `TEAM_PITCHING_BB` (VIF = 196,404.2), `TEAM_PITCHING_SO` (VIF = 197,267.5) are extremely high  indicating severe multicollinearity. This level of multicollinearity can cause problems in estimating the coefficients reliably and can inflate the standard errors of the coefficients.
+
+- **Other Variables (VIF values close to 1):** For other variables like `TEAM_BATTING_2B`, `TEAM_BATTING_3B`, `TEAM_BASERUN_SB`, `TEAM_FIELDING_E`, and `TEAM_FIELDING_DP`, the VIF values are low, indicating low or negligible multicollinearity.
+
+Based on the multicollinearity, we will create multiple linear regression models with the following approaches:
+
+
+### 5 Feature Engineering and Model Building
+#### i. Baseline Model
+   - **Model 1:** Use all variables except those with extremely high VIF values.
+     - **Variables:** All except `TEAM_BATTING_BB`, `TEAM_PITCHING_SO`, `TEAM_PITCHING_BB`, and `TEAM_PITCHING_HR`.
+     - **Rationale:** This model tests the impact of removing variables with the highest multicollinearity while keeping the rest to ensure comprehensive coverage of all aspects of the game.
+
+##### a. Feature engineer training data for Baseline Model
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_scaled)), names(money_ball_train_scaled))
+
+# Drop the columns with high VIF values using their names
+money_ball_train_baseline <- money_ball_train_scaled[, !names(money_ball_train_scaled) %in% c("TEAM_BATTING_SO", "TEAM_PITCHING_SO", "TEAM_BATTING_HR ")]
+
+# Check for any NA values and remove rows with NA values if they exist
+money_ball_train_baseline <- na.omit(money_ball_train_baseline)
+```
+
+##### b. Feature engineer evaluation data for Baseline Model
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_scaled)), names(money_ball_evaluate_scaled))
+
+# Drop the columns with high VIF values using their names
+money_ball_evaluate_baseline <- money_ball_evaluate_scaled[, !names(money_ball_evaluate_scaled) %in% c("TEAM_BATTING_SO", "TEAM_PITCHING_SO", "TEAM_BATTING_HR ")]
+
+# Check for any NA values and remove rows with NA values if they exist
+money_ball_evaluate_baseline <- na.omit(money_ball_evaluate_baseline)
+
+```
+
+##### c. Fit the Base Line Model
+
+```{r}
+# Fit the multiple linear regression model using the remaining variables
+baseline_model <- lm(TARGET_WINS ~ ., data = money_ball_train_baseline)
+
+# Summary of the model
+summary(baseline_model)
+
+```
+##### d. Interpretation of the significant coefficients
+
+- **TEAM_BATTING_H (Hits):** Positive impact on wins (+0.51586). More hits generally lead to more runs and wins.
+- **TEAM_BATTING_2B (Doubles):** Slight negative impact on wins (-0.06981). Possibly due to multicollinearity.
+- **TEAM_BATTING_BB (Walks):** Positive impact on wins (+0.35319). Walks contribute to more scoring opportunities.
+- **TEAM_BASERUN_SB (Stolen Bases):** Positive impact on wins (+0.19349). Successful steals lead to more runs.
+- **TEAM_FIELDING_E (Errors):** Negative impact on wins (-0.26004). More errors generally result in fewer wins.
+
+##### e. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(baseline_model)
+```
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The spread of residuals around the horizontal line is somewhat uneven, suggesting non-linearity and possible heteroscedasticity (non-constant variance).
+- **Q-Q Plot:** The tails deviate from the straight line, indicating potential non-normality in the residuals, particularly in the extreme values.
+- **Scale-Location:** The red line is slightly curved, and residuals seem more dispersed at higher fitted values, confirming heteroscedasticity.
+- **Residuals vs Leverage:** A few points have high leverage, which may indicate influential outliers affecting the model's stability.
+
+#### ii. Model with Composite Variables
+   - **Model 2:** Create composite variables for highly correlated variables and drop individual variables.
+     - **Variables:**
+       - **Composite Variable 1:** Average of `TEAM_BATTING_H`, `TEAM_BATTING_2B`, and `TEAM_BATTING_HR`.
+       - **Composite Variable 2:** Average of `TEAM_PITCHING_H`, `TEAM_PITCHING_HR`, and `TEAM_PITCHING_BB`.
+       - **Retained Variables:** Other variables that aren't highly correlated or have significant unique contributions, like `TEAM_FIELDING_DP` and `TEAM_FIELDING_E`.
+     - **Rationale:** This model reduces multicollinearity by combining highly correlated variables into composite variables.
+
+##### a. Feature engineer training data for Model with Composite Variables
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_scaled)), names(money_ball_train_scaled))
+
+# Calculate composite variables using base R
+Composite_Batting <- rowMeans(money_ball_train_scaled[, c(column_indexes["TEAM_BATTING_H"], 
+                                                          column_indexes["TEAM_BATTING_2B"])])
+
+Composite_Pitching <- money_ball_train_scaled[[column_indexes["TEAM_PITCHING_H"]]]
+
+# Ensure the composite variables are numeric vectors
+Composite_Batting <- as.numeric(Composite_Batting)
+Composite_Pitching <- as.numeric(Composite_Pitching)
+
+# Add the composite variables to the dataset
+money_ball_train_composite <- money_ball_train_scaled %>%
+  mutate(Composite_Batting = Composite_Batting, Composite_Pitching = Composite_Pitching)
+
+# Drop the original individual variables that were used to create the composites
+money_ball_train_composite <- money_ball_train_composite[, !names(money_ball_train_composite) %in% 
+                                                         c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                           "TEAM_BATTING_HR", "TEAM_PITCHING_H", 
+                                                           "TEAM_PITCHING_HR", "TEAM_PITCHING_SO", 
+                                                           "TEAM_PITCHING_BB")]
+```
+
+##### b. Feature engineer evaluation data for Model with Composite Variables
+```{r}
+# Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_scaled)), names(money_ball_evaluate_scaled))
+
+# Calculate composite variables using base R
+Composite_Batting <- rowMeans(money_ball_evaluate_scaled[, c(column_indexes["TEAM_BATTING_H"], 
+                                                          column_indexes["TEAM_BATTING_2B"])])
+
+Composite_Pitching <- money_ball_evaluate_scaled[[column_indexes["TEAM_PITCHING_H"]]]
+
+# Ensure the composite variables are numeric vectors
+Composite_Batting <- as.numeric(Composite_Batting)
+Composite_Pitching <- as.numeric(Composite_Pitching)
+
+# Add the composite variables to the dataset
+money_ball_evaluate_composite <- money_ball_evaluate_scaled %>%
+  mutate(Composite_Batting = Composite_Batting, Composite_Pitching = Composite_Pitching)
+
+# Drop the original individual variables that were used to create the composites
+money_ball_evaluate_composite <- money_ball_evaluate_composite[, !names(money_ball_evaluate_composite) %in% 
+                                                         c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                           "TEAM_BATTING_HR", "TEAM_PITCHING_H", 
+                                                           "TEAM_PITCHING_HR", "TEAM_PITCHING_SO", 
+                                                           "TEAM_PITCHING_BB")]
+```
+
+##### c. Fit the  Model with Composite Variables
+
+```{r}
+# Fit the multiple linear regression model using the remaining variables including the composite variables
+composite_model <- lm(TARGET_WINS ~ Composite_Batting + Composite_Pitching + TEAM_FIELDING_DP + TEAM_FIELDING_E, 
+                      data = money_ball_train_composite)
+
+# Summary of the model
+summary(composite_model)
+
+
+
+
+```
+
+##### d. Interpretation of the significant coefficients
+
+- **Composite_Batting:** Positive impact on wins (+0.49004). Better batting performance leads to more wins.
+- **Composite_Pitching:** Slight negative impact on wins (-0.08204). Higher composite pitching values may indicate allowing more hits, reducing wins.
+- **TEAM_FIELDING_DP (Double Plays):** Negative impact on wins (-0.13093). Could suggest that reliance on double plays is correlated with weaker overall defense.
+- **TEAM_FIELDING_E (Errors):** Negative impact on wins (-0.05668). More errors reduce the likelihood of winning.
+
+##### e. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(composite_model)
+```
+
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The residuals still show some pattern, especially at higher fitted values, indicating that the model may not fully capture the relationship between the variables. There's also slight evidence of heteroscedasticity.
+- **Q-Q Plot:** The residuals generally follow the line but deviate at the extremes, suggesting potential issues with normality, particularly in the tails.
+- **Scale-Location:** The red line shows a slight curve, and the spread of residuals increases as fitted values rise, indicating heteroscedasticity.
+- **Residuals vs Leverage:** Some high-leverage points are identified, but they don't appear overly influential on the model. However, they could still be potential outliers that affect the model's accuracy.
+
+#### iii. Model with Interaction Terms
+   - **Model 3:** Incorporate interaction terms between key variables.
+     - **Variables:**
+       - Include interaction terms like `TEAM_BATTING_H * TEAM_BATTING_HR` or `TEAM_PITCHING_H * TEAM_PITCHING_BB`.
+       - Drop individual variables contributing to interaction terms to prevent redundancy.
+       - Retain core independent variables that might have unique, significant effects.
+     - **Rationale:** Interaction terms can capture synergistic effects between variables, offering a more nuanced understanding of how these variables collectively impact the target variable.
+
+##### a. Feature engineer training data for Model with Interaction Terms
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_scaled)), names(money_ball_train_scaled))
+
+# Step 2: Ensure the columns are numeric vectors
+TEAM_BATTING_H <- as.numeric(money_ball_train_scaled[[column_indexes["TEAM_BATTING_H"]]])
+TEAM_BATTING_2B <- as.numeric(money_ball_train_scaled[[column_indexes["TEAM_BATTING_2B"]]])
+TEAM_PITCHING_H <- as.numeric(money_ball_train_scaled[[column_indexes["TEAM_PITCHING_H"]]])
+TEAM_PITCHING_BB <- as.numeric(money_ball_train_scaled[[column_indexes["TEAM_PITCHING_BB"]]])
+
+# Step 3: Calculate interaction terms using numeric vectors
+Interaction_Batting <- TEAM_BATTING_H * TEAM_BATTING_2B
+Interaction_Pitching <- TEAM_PITCHING_H * TEAM_PITCHING_BB
+
+# Step 4: Add the interaction terms to the dataset
+money_ball_train_interaction <- money_ball_train_scaled %>%
+  mutate(Interaction_Batting = Interaction_Batting, Interaction_Pitching = Interaction_Pitching)
+
+# Step 5: Drop the original individual variables used to create interaction terms
+money_ball_train_interaction <- money_ball_train_interaction[, !names(money_ball_train_interaction) %in% 
+                                                             c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                               "TEAM_PITCHING_H", "TEAM_PITCHING_BB")]
+```
+
+##### b. Feature engineer evaluation data for Model with Interaction Terms
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_scaled)), names(money_ball_evaluate_scaled))
+
+# Step 2: Ensure the columns are numeric vectors
+TEAM_BATTING_H <- as.numeric(money_ball_evaluate_scaled[[column_indexes["TEAM_BATTING_H"]]])
+TEAM_BATTING_2B <- as.numeric(money_ball_evaluate_scaled[[column_indexes["TEAM_BATTING_2B"]]])
+TEAM_PITCHING_H <- as.numeric(money_ball_evaluate_scaled[[column_indexes["TEAM_PITCHING_H"]]])
+TEAM_PITCHING_BB <- as.numeric(money_ball_evaluate_scaled[[column_indexes["TEAM_PITCHING_BB"]]])
+
+# Step 3: Calculate interaction terms using numeric vectors
+Interaction_Batting <- TEAM_BATTING_H * TEAM_BATTING_2B
+Interaction_Pitching <- TEAM_PITCHING_H * TEAM_PITCHING_BB
+
+# Step 4: Add the interaction terms to the dataset
+money_ball_evaluate_interaction <- money_ball_evaluate_scaled %>%
+  mutate(Interaction_Batting = Interaction_Batting, Interaction_Pitching = Interaction_Pitching)
+
+# Step 5: Drop the original individual variables used to create interaction terms
+money_ball_evaluate_interaction <- money_ball_evaluate_interaction[, !names(money_ball_evaluate_interaction) %in% 
+                                                             c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                               "TEAM_PITCHING_H", "TEAM_PITCHING_BB")]
+```
+
+##### c. Fit the  Model with Interaction Terms
+
+```{r}
+# Fit the multiple linear regression model using the remaining variables including the interaction terms
+interaction_model <- lm(TARGET_WINS ~ Interaction_Batting + Interaction_Pitching + 
+                        TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
+                        TEAM_FIELDING_DP + TEAM_FIELDING_E, 
+                        data = money_ball_train_interaction)
+
+# Summary of the model
+summary(interaction_model)
+
+
+
+
+```
+
+##### d. Interpretation of the significant coefficients
+
+- **Interaction_Batting:** Positive impact on wins (+0.45338). Indicates that the interaction between batting variables has a strong positive effect on the number of wins.
+- **TEAM_BASERUN_SB:** Positive impact on wins (+0.12765). Successful stolen bases contribute positively to the number of wins.
+- **TEAM_BASERUN_CS:** Negative impact on wins (-0.08464). Caught stealing negatively impacts the number of wins.
+- **TEAM_FIELDING_DP:** Negative impact on wins (-0.10570). Similar to previous models, reliance on double plays correlates with fewer wins.
+- **TEAM_FIELDING_E:** Negative impact on wins (-0.15119). More errors strongly reduce the likelihood of winning.
+
+##### e. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(interaction_model)
+```
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The residuals show a pattern, particularly at higher fitted values, indicating potential issues with model fit. There's also slight evidence of heteroscedasticity, as the spread of residuals increases with fitted values.
+- **Q-Q Plot:** The residuals mostly follow the expected line, but there are deviations at the extremes, suggesting some issues with normality, particularly in the tails.
+- **Scale-Location:** The red line shows a curve, indicating that the variance of the residuals is not constant across all levels of fitted values. This suggests heteroscedasticity, where the spread of residuals increases as fitted values rise.
+- **Residuals vs Leverage:** There are a few high-leverage points, notably point 13420. While they don’t appear overly influential, they could still affect the model's accuracy and should be examined further.
+
+#### iv. Feature Selection Model
+   - **Model 4:** Perform backward stepwise regression or Lasso/Ridge regression to select the most impactful variables.
+     - **Variables:** Start with all the variables, including composite and interaction terms if applicable, and use a method to select the best subset.
+     - **Rationale:** This model allows the data itself to determine which variables should be included, ensuring only the most significant predictors remain.
+
+##### a. Feature engineer training data for Model with Interaction Terms
+```{r}
+# Load the necessary package
+library(MASS)
+
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_scaled)), names(money_ball_train_scaled))
+
+# Step 2: Calculate composite variables using base R and ensure they are numeric vectors
+Composite_Batting <- rowMeans(money_ball_train_scaled[, c(column_indexes["TEAM_BATTING_H"], 
+                                                          column_indexes["TEAM_BATTING_2B"])])
+
+Composite_Pitching <- as.numeric(money_ball_train_scaled[[column_indexes["TEAM_PITCHING_H"]]])
+
+# Step 3: Add the composite and interaction terms to the dataset
+money_ball_train_feature_selection <- money_ball_train_scaled %>%
+  mutate(Composite_Batting = Composite_Batting,
+         Composite_Pitching = Composite_Pitching,
+         Interaction_Batting = Composite_Batting * money_ball_train_scaled[[column_indexes["TEAM_BATTING_2B"]]], 
+         Interaction_Pitching = Composite_Pitching * money_ball_train_scaled[[column_indexes["TEAM_PITCHING_BB"]]])
+
+# Step 4: Drop the original individual variables that were used to create composite and interaction terms
+money_ball_train_feature_selection <- money_ball_train_feature_selection[, !names(money_ball_train_feature_selection) %in% 
+                                                                         c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                                           "TEAM_PITCHING_H", "TEAM_PITCHING_BB")]
+```
+
+##### b. Feature engineer evaluation data for Model with Interaction Terms
+```{r}
+# Load the necessary package
+library(MASS)
+
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_scaled)), names(money_ball_evaluate_scaled))
+
+# Step 2: Calculate composite variables using base R and ensure they are numeric vectors
+Composite_Batting <- rowMeans(money_ball_evaluate_scaled[, c(column_indexes["TEAM_BATTING_H"], 
+                                                          column_indexes["TEAM_BATTING_2B"])])
+
+Composite_Pitching <- as.numeric(money_ball_evaluate_scaled[[column_indexes["TEAM_PITCHING_H"]]])
+
+# Step 3: Add the composite and interaction terms to the dataset
+money_ball_evaluate_feature_selection <- money_ball_evaluate_scaled %>%
+  mutate(Composite_Batting = Composite_Batting,
+         Composite_Pitching = Composite_Pitching,
+         Interaction_Batting = Composite_Batting * money_ball_evaluate_scaled[[column_indexes["TEAM_BATTING_2B"]]], 
+         Interaction_Pitching = Composite_Pitching * money_ball_evaluate_scaled[[column_indexes["TEAM_PITCHING_BB"]]])
+
+# Step 4: Drop the original individual variables that were used to create composite and interaction terms
+money_ball_evaluate_feature_selection <- money_ball_evaluate_feature_selection[, !names(money_ball_evaluate_feature_selection) %in% 
+                                                                         c("TEAM_BATTING_H", "TEAM_BATTING_2B", 
+                                                                           "TEAM_PITCHING_H", "TEAM_PITCHING_BB")]
+
+```
+
+##### c. Fit the  Model with Interaction Terms
+```{r}
+# Step 1: Fit the full model with all variables
+full_model <- lm(TARGET_WINS ~ ., data = money_ball_train_feature_selection)
+
+# Step 2: Perform backward stepwise regression to select the best model
+stepwise_model <- stepAIC(full_model, direction = "backward", trace = FALSE)
+
+# Summary of the selected model
+summary(stepwise_model)
+
+
+
+```
+
+##### c. Interpretation of the significant coefficients
+
+- **TEAM_BATTING_3B:** Positive impact on wins (+0.12141). Triples contribute positively to the number of wins.
+- **TEAM_BATTING_BB:** Positive impact on wins (+0.12328). Walks (BB) positively influence wins, indicating the importance of plate discipline.
+- **TEAM_BATTING_SO:** Negative impact on wins (-0.24745). Strikeouts negatively affect the number of wins, as they represent lost opportunities to score.
+- **TEAM_BASERUN_SB:** Positive impact on wins (+0.22077). Stolen bases significantly increase the chances of winning.
+- **TEAM_BASERUN_CS:** Negative impact on wins (-0.09336). Being caught stealing has a strong negative impact on wins.
+- **TEAM_PITCHING_HR:** Negative impact on wins (-0.20482). Allowing home runs negatively impacts the number of wins.
+- **TEAM_FIELDING_E:** Negative impact on wins (-0.14040). More errors reduce the likelihood of winning.
+- **TEAM_FIELDING_DP:** Negative impact on wins (-0.11498). Again, relying on double plays correlates with fewer wins.
+- **Composite_Batting:** Positive impact on wins (+0.44821). The composite batting variable significantly increases the chances of winning.
+- **Interaction_Batting:** Negative impact on wins (-0.22306). Interaction between batting variables reduces wins, possibly due to overcompensation or diminishing returns.
+
+##### d. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(stepwise_model)
+```
+
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The residuals are scattered around the zero line with some spread, particularly at higher fitted values, which suggests potential issues with heteroscedasticity.
+- **Q-Q Plot:** The residuals follow the theoretical quantiles fairly well, though there are slight deviations at the tails, indicating possible issues with normality, especially at the extremes.
+- **Scale-Location:** This plot shows a relatively constant spread of residuals, but there is a slight upward trend indicating mild heteroscedasticity.
+- **Residuals vs Leverage:** Points 13420, 20120, and 415 have high leverage, with 13420 and 415 close to the Cook’s distance threshold, suggesting they might disproportionately influence the model.
+
+#### v. Fielding-Focused Model
+   - **Model 5:** Focus specifically on the fielding-related variables (`TEAM_FIELDING_DP` and `TEAM_FIELDING_E`) alongside a few selected pitching and batting variables.
+     - **Variables:** `TEAM_FIELDING_DP`, `TEAM_FIELDING_E`, a few selected batting variables (e.g., `TEAM_BATTING_H`), and pitching variables (e.g., `TEAM_PITCHING_H`).
+     - **Rationale:** This model emphasizes the impact of fielding on wins while controlling for key batting and pitching effects.
+
+##### a. Feature engineer training data for Fielding-Focused Model
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_train_scaled)), names(money_ball_train_scaled))
+
+# Step 2: Select fielding-related variables along with selected batting and pitching variables
+# We will use the following variables:
+# - TEAM_FIELDING_DP
+# - TEAM_FIELDING_E
+# - TEAM_BATTING_H
+# - TEAM_BATTING_2B
+# - TEAM_PITCHING_H
+
+selected_columns <- c(column_indexes["TEAM_FIELDING_DP"], 
+                      column_indexes["TEAM_FIELDING_E"], 
+                      column_indexes["TEAM_BATTING_H"], 
+                      column_indexes["TEAM_BATTING_2B"], 
+                      column_indexes["TEAM_PITCHING_H"])
+
+# Step 3: Subset the dataset to include only these selected columns
+money_ball_train_fielding <- money_ball_train_scaled[, selected_columns]
+
+# Step 4: Ensure the TARGET_WINS column is included in the data for the regression model
+money_ball_train_fielding$TARGET_WINS <- money_ball_train_scaled$TARGET_WINS
+                                                                    
+```
+
+##### b. Feature engineer evaluation data for Fielding-Focused Model
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_scaled)), names(money_ball_evaluate_scaled))
+
+# Step 2: Select fielding-related variables along with selected batting and pitching variables
+# We will use the following variables:
+# - TEAM_FIELDING_DP
+# - TEAM_FIELDING_E
+# - TEAM_BATTING_H
+# - TEAM_BATTING_2B
+# - TEAM_PITCHING_H
+
+selected_columns <- c(column_indexes["TEAM_FIELDING_DP"], 
+                      column_indexes["TEAM_FIELDING_E"], 
+                      column_indexes["TEAM_BATTING_H"], 
+                      column_indexes["TEAM_BATTING_2B"], 
+                      column_indexes["TEAM_PITCHING_H"])
+
+# Step 3: Subset the dataset to include only these selected columns
+money_ball_evaluate_fielding <- money_ball_evaluate_scaled[, selected_columns]
+
+# Step 4: Ensure the TARGET_WINS column is included in the data for the regression model
+money_ball_evaluate_fielding$TARGET_WINS <- money_ball_evaluate_scaled$TARGET_WINS
+
+```
+
+##### c. Fit the  Fielding-Focused Model
+```{r}
+# Step 5: Fit the multiple linear regression model using the selected variables
+fielding_model <- lm(TARGET_WINS ~ ., data = money_ball_train_fielding)
+
+# Step 6: Summary of the model
+summary(fielding_model)
+
+
+```
+
+##### d. Interpretation of the significant coefficients
+
+- **TEAM_FIELDING_DP:** Negative impact on wins (-0.14599). A higher number of double plays correlates with fewer wins.
+- **TEAM_FIELDING_E:** Negative impact on wins (-0.16930). More fielding errors significantly reduce the number of wins.
+- **TEAM_BATTING_H:** Positive impact on wins (+0.17593). Hits significantly increase the chances of winning.
+- **TEAM_BATTING_2B:** Negative impact on wins (-0.07462). Doubles surprisingly have a negative impact on wins, possibly due to confounding factors.
+- **TEAM_PITCHING_H:** Negative impact on wins (-0.12239). Allowing more hits leads to fewer wins.
+
+##### e. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(fielding_model)
+```
+
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The residuals are generally scattered around the zero line with no obvious pattern, indicating a decent fit. However, some spread is evident at higher fitted values, suggesting potential heteroscedasticity.
+- **Q-Q Plot:** The residuals closely follow the theoretical quantiles, but slight deviations at the tails indicate some issues with normality, particularly at the extremes.
+- **Scale-Location:** The plot shows a fairly constant spread of residuals, which suggests that heteroscedasticity is not a significant issue.
+- **Residuals vs Leverage:** Similar to the previous model, points 13420 and 2138 show higher leverage and Cook’s distance near the threshold, implying these points might have an outsized influence on the model.
+
+#### vi. Model with Polynomial Terms
+   - **Variables:** `TEAM_BATTING_H`, `TEAM_PITCHING_H` (with polynomial terms), `TEAM_FIELDING_DP`, and `TEAM_FIELDING_E`.
+   - **Rationale:** 
+     - `TEAM_BATTING_H`: Captures potential non-linear effects of team hits on wins, where additional hits may have diminishing or accelerating returns.
+     - `TEAM_PITCHING_H`: Models non-linear effects of hits allowed by pitching, reflecting how reducing hits might impact wins differently at various levels.
+     - `TEAM_FIELDING_DP` and `TEAM_FIELDING_E`: Included as linear terms to control for the overall defensive quality while assessing the non-linear batting and pitching effects.
+
+##### a. Feature engineer training data for Fielding-Focused Model
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+money_ball_train_polynomial <- money_ball_train_scaled
+column_indexes <- setNames(seq_along(names(money_ball_train_polynomial)), names(money_ball_train_polynomial))
+
+# Step 2: Select variables for polynomial terms
+# We'll use TEAM_BATTING_H and TEAM_PITCHING_H and create polynomial terms for them
+
+# Ensure the variables are numeric
+money_ball_train_polynomial$TEAM_BATTING_H <- as.numeric(money_ball_train_polynomial[[column_indexes["TEAM_BATTING_H"]]])
+money_ball_train_polynomial$TEAM_PITCHING_H <- as.numeric(money_ball_train_polynomial[[column_indexes["TEAM_PITCHING_H"]]])
+
+```
+
+##### b. Feature engineer evaluation data for Fielding-Focused Model
+```{r}
+# Step 1: Create a named vector with column names and their indexes
+money_ball_evaluate_polynomial <- money_ball_evaluate_scaled
+column_indexes <- setNames(seq_along(names(money_ball_evaluate_polynomial)), names(money_ball_evaluate_polynomial))
+
+# Step 2: Select variables for polynomial terms
+# We'll use TEAM_BATTING_H and TEAM_PITCHING_H and create polynomial terms for them
+
+# Ensure the variables are numeric
+money_ball_evaluate_polynomial$TEAM_BATTING_H <- as.numeric(money_ball_evaluate_polynomial[[column_indexes["TEAM_BATTING_H"]]])
+money_ball_evaluate_polynomial$TEAM_PITCHING_H <- as.numeric(money_ball_evaluate_polynomial[[column_indexes["TEAM_PITCHING_H"]]])
+
+```
+
+##### c. Fit the  Fielding-Focused Model
+
+```{r}
+# Fit a model with polynomial terms
+# We'll use quadratic (degree 2) polynomial terms for TEAM_BATTING_H and TEAM_PITCHING_H
+polynomial_model <- lm(TARGET_WINS ~ poly(TEAM_BATTING_H, 2) + poly(TEAM_PITCHING_H, 2) + 
+                                    TEAM_FIELDING_DP + TEAM_FIELDING_E, 
+                       data = money_ball_train_polynomial)
+
+# Step 4: Summary of the model
+summary(polynomial_model)
+
+```
+##### c. Interpretation of the significant coefficients
+
+- **poly(TEAM_BATTING_H, 2)_1:** Positive quadratic effect on wins (+2.37904). The first-order term indicates that the relationship between hits and wins is not strictly linear, with increasing hits leading to more wins, but at a varying rate.
+- **poly(TEAM_BATTING_H, 2)_2:** Positive effect (+0.44967), reinforcing the non-linear relationship.
+- **poly(TEAM_PITCHING_H, 2)_1:** Negative quadratic effect on wins (-0.53243). As the number of hits allowed increases, the negative impact on wins becomes more pronounced.
+- **poly(TEAM_PITCHING_H, 2)_2:** Negative effect (-0.35234), further suggesting a non-linear, detrimental effect of pitching hits on wins.
+- **TEAM_FIELDING_DP:** Negative impact on wins (-0.14335). More double plays are correlated with fewer wins.
+- **TEAM_FIELDING_E:** Negative impact on wins (-0.18983). Fielding errors significantly reduce the number of wins.
+
+##### d. Residual analysis
+
+```{r}
+# Residual analysis of the transformed model
+par(mfrow = c(2, 2))
+plot(polynomial_model)
+```
+
+**Analysis of Residual Plots:**
+
+- **Residuals vs Fitted:** The residuals do not appear to follow a clear pattern, indicating a reasonable model fit. However, there is some spread at higher fitted values, which may suggest slight heteroscedasticity.
+- **Q-Q Plot:** The residuals mostly follow the theoretical quantiles, but there are deviations at the tails, suggesting some issues with the normality of residuals, particularly at the extremes.
+- **Scale-Location:** The red line is mostly flat, indicating that the variance of residuals is relatively constant across fitted values. This suggests that heteroscedasticity is not a major issue in this model.
+- **Residuals vs Leverage:** There are a few points with higher leverage, notably point 13420, and one point (2138) with a Cook's distance near the threshold, indicating it could be influential. These points should be further investigated to ensure they are not unduly affecting the model.
+
+
+### 6. Model Selection
+
+#### a. Model Selection based on matrix
+```{r}
+# Calculate the R-squared, Adjusted R-squared, AIC, BIC, and Residual Standard Error (RSE) for each model
+
+model_list <- list(baseline_model, composite_model, interaction_model, stepwise_model, fielding_model, polynomial_model)
+
+# Create a data frame to store the comparison metrics
+model_comparison <- data.frame(
+  Model = c("Baseline Model", "Composite Variables Model", "Interaction Terms Model", "Feature Selection Model", "Fielding-Focused Model", "Polynomial Model"),
+  R_squared = sapply(model_list, function(model) summary(model)$r.squared),
+  Adjusted_R_squared = sapply(model_list, function(model) summary(model)$adj.r.squared),
+  AIC = sapply(model_list, AIC),
+  BIC = sapply(model_list, BIC),
+  RSE = sapply(model_list, function(model) sqrt(sum(residuals(model)^2) / model$df.residual))
+)
+
+# Print the comparison data frame
+print(model_comparison)
+
+# Perform ANOVA to compare models and store the result
+anova_results <- anova(baseline_model, composite_model, interaction_model, stepwise_model, fielding_model, polynomial_model)
+
+# Extract the ANOVA results into a data frame
+anova_df <- data.frame(
+  Model = c("Baseline Model", "Composite Variables Model", "Interaction Terms Model", "Feature Selection Model", "Fielding-Focused Model", "Polynomial Model"),
+  Res_Df = anova_results$Res.Df,
+  RSS = anova_results$RSS,
+  Df = c(NA, diff(anova_results$Res.Df)),  # Compute the difference in Res.Df for Df column
+  Sum_of_Sq = c(NA, anova_results$`Sum of Sq`[-1]),  # Sum of Sq starting from second model
+  F_value = c(NA, anova_results$F[-1]),  # F-values starting from second model
+  Pr_F = c(NA, anova_results$`Pr(>F)`[-1])  # p-values starting from second model
+)
+
+# Display the ANOVA results data frame
+print(anova_df)
+
+
+```
+
+Based on the above comparison of the models.
+
+- **Best Model:**
+  - The **Baseline Model** performs well, with the highest R-squared and Adjusted R-squared values (0.312 and 0.308 respectively). It also has the lowest AIC and BIC values, indicating that it provides a good balance between model complexity and fit. This model explains the most variance.
+
+- **Second Best:**
+  - The **Feature Selection Model** is very close to the Baseline Model in terms of R-squared and Adjusted R-squared values, with a slightly lower complexity as shown by its similar AIC and BIC. This suggests that the Feature Selection Model may be a suitable alternative if model simplicity is a priority.
+
+- **Other Models:**
+  - The **Polynomial Model** offers some improvement over the **Composite Variables Model** and the **Fielding-Focused Model** in terms of R-squared and Adjusted R-squared, but it is still not as effective as the Baseline or Feature Selection models. It shows that introducing polynomial terms adds some value, but not as much as expected.
+
+  - The **Interaction Terms Model** performs worse than the Baseline and Feature Selection models but slightly better than the Composite Variables Model. This indicates that while interaction terms are important, they may not be as impactful as other model adjustments like feature selection.
+
+  - The **Composite Variables Model** and **Fielding-Focused Model** are less effective overall, with lower R-squared and Adjusted R-squared values. This was somewhat expected given their design to focus on specific aspects of the game rather than capturing the overall complexity.
+
+### 7. Prediction using the models
+
+
+```{r}
+# Assuming the evaluation datasets are already transformed and scaled:
+# money_ball_evaluate_baseline
+# money_ball_evaluate_composite
+# money_ball_evaluate_interaction
+# money_ball_evaluate_feature_selection
+# money_ball_evaluate_fielding
+# money_ball_evaluate_polynomial
+
+# Also assuming the models are:
+# baseline_model, composite_model, interaction_model, stepwise_model, fielding_model, polynomial_model
+
+# Step 1: Get the min and max values of TARGET_WINS from the original (unscaled) training data
+min_target <- min(money_ball_train$TARGET_WINS)
+max_target <- max(money_ball_train$TARGET_WINS)
+
+# Step 2: Reverse the Min-Max scaling function
+reverse_min_max_scale <- function(pred, min_val, max_val) {
+  return(pred * (max_val - min_val) + min_val)
+}
+
+# Step 3: Make predictions on the evaluation datasets
+predictions_combined <- data.frame(
+  Baseline_Predictions = predict(baseline_model, newdata = money_ball_evaluate_baseline),
+  Composite_Predictions = predict(composite_model, newdata = money_ball_evaluate_composite),
+  Interaction_Predictions = predict(interaction_model, newdata = money_ball_evaluate_interaction),
+  Feature_Selection_Predictions = predict(stepwise_model, newdata = money_ball_evaluate_feature_selection),
+  Fielding_Predictions = predict(fielding_model, newdata = money_ball_evaluate_fielding),
+  Polynomial_Predictions = predict(polynomial_model, newdata = money_ball_evaluate_polynomial)
+)
+
+# Step 4: Reverse the scaling of the predictions to bring them back to their original scale
+predictions_combined_original_scale <- data.frame(
+  Baseline_Predictions = reverse_min_max_scale(predictions_combined$Baseline_Predictions, min_target, max_target),
+  Composite_Predictions = reverse_min_max_scale(predictions_combined$Composite_Predictions, min_target, max_target),
+  Interaction_Predictions = reverse_min_max_scale(predictions_combined$Interaction_Predictions, min_target, max_target),
+  Feature_Selection_Predictions = reverse_min_max_scale(predictions_combined$Feature_Selection_Predictions, min_target, max_target),
+  Fielding_Predictions = reverse_min_max_scale(predictions_combined$Fielding_Predictions, min_target, max_target),
+  Polynomial_Predictions = reverse_min_max_scale(predictions_combined$Polynomial_Predictions, min_target, max_target)
+)
+
+# Step 5: Display the reversed predictions
+print(predictions_combined_original_scale)
+
+# Step 6: Optionally, view the first few rows of the reversed predictions
+head(predictions_combined_original_scale)
+
+
+```
+
