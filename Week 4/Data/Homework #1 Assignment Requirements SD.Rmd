@@ -121,7 +121,7 @@ money <- money_ball_train
 
 # Create missing data flags
 #missing_flag <- ifelse(is.na(money_ball_train$TEAM_BATTING_HBP), 1, 2)
-#money_ball_train$missing_flag <- missing_flag (see below)
+#money_ball_train$missing_flag <- missing_flag
 
 
 par(mfrow=c(3,3)) 
@@ -205,20 +205,6 @@ We have about 9% of the data missing that spread out to
 > TEAM_BASERUN_CS 12.57%
 > TEAM_BATTING_HBP 91.61%
 
-### Create flags to suggest if a variable was missing
-
-To allow the model to identify whether missing values themselves have predictive power regarding the outcome variable, I created binary flags for missing values in columns with missing data.
-
-```{r}
-money_ball_train <- money_ball_train %>%
-  mutate(
-    pitching_so_missing = ifelse(is.na(TEAM_PITCHING_SO), 1, 0),
-    batting_so_missing = ifelse(is.na(TEAM_BATTING_SO), 1, 0),
-    baserun_sb_missing = ifelse(is.na(TEAM_BASERUN_SB), 1, 0),
-    baserun_cs_missing = ifelse(is.na(TEAM_BASERUN_CS), 1, 0),
-    batting_hbp_missing = ifelse(is.na(TEAM_BATTING_HBP), 1, 0)
-  )
-```
 
 **Why Use Predictive Imputation?**
 
@@ -534,7 +520,9 @@ Based on the comparison of R-squared, RMSE/MSE, and F-statistic, Model 3 appears
 
 - - - - - - - - - - - - - - - -  - - -- - - - - - - - - - - - 
 
-SOULEYMANE 
+
+
+# SOULEYMANE 
 
 ## Log Transformation
 
@@ -562,8 +550,7 @@ model_log <- lm(TARGET_WINS ~ log_TEAM_BATTING_H + log_TEAM_BATTING_2B +
                 data = money_ball_log)
 
 # Model summary
-summary(model_log)
-
+# summary(model_log)
 ```
 
 ## Square Root Transformation 
@@ -591,15 +578,13 @@ model_sqrt <- lm(TARGET_WINS ~ sqrt_TEAM_BATTING_H + sqrt_TEAM_BATTING_2B +
                  data = money_ball_sqrt)
 
 # Model summary
-summary(model_sqrt)
-
-
+# summary(model_sqrt)
 ```
 
 ## Interaction Terms
 ```{r Interaction_Terms}
 # Interaction terms between batting and pitching stats
-money_ball_interaction <- money_ball %>%
+money_ball_interaction_outlier <- money_ball %>%
   mutate(
     interaction_HR_BB = TEAM_BATTING_HR * TEAM_BATTING_BB,
     interaction_Pitching_HR_BB = TEAM_PITCHING_HR * TEAM_PITCHING_BB,
@@ -607,21 +592,20 @@ money_ball_interaction <- money_ball %>%
   )
 
 # Fit a linear regression model with interaction terms
-model_interaction <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
+model_interaction_outlier <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B +
                         TEAM_BATTING_HR + TEAM_BATTING_BB + TEAM_BATTING_SO +
                         TEAM_BASERUN_SB + TEAM_BASERUN_CS +
                         TEAM_PITCHING_H + TEAM_PITCHING_HR + TEAM_PITCHING_BB + TEAM_PITCHING_SO +
                         TEAM_FIELDING_E + TEAM_FIELDING_DP +
                         interaction_HR_BB + interaction_Pitching_HR_BB + interaction_Fielding_E_DP,
-                      data = money_ball_interaction)
+                      data = money_ball_interaction_outlier)
 
 # Model summary
-summary(model_interaction)
+# summary(model_interaction_outlier)
 
 ```
 
 ## Removing Outliers
-
 ```{r Removing_Outliers}
 # Function to remove outliers based on IQR method
 remove_outliers <- function(df, cols) {
@@ -651,11 +635,10 @@ model_no_outliers <- lm(TARGET_WINS ~ TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BA
                         data = money_ball_no_outliers)
 
 # Model summary
-summary(model_no_outliers)
+# summary(model_no_outliers)
 ```
 
 ## Outlier Removal and Interaction Terms Model
-
 ```{r Outlier_Removal_and_Interaction_Terms_Model}
 # Remove outliers based on IQR for key variables
 money_ball_clean <- money_ball %>%
@@ -665,21 +648,88 @@ money_ball_clean <- money_ball %>%
   )
 
 # Create interaction terms for batting and pitching stats
-money_ball_interaction <- money_ball_clean %>%
+money_ball_interaction_no_outlier <- money_ball_clean %>%
   mutate(
     interaction_BATTING = TEAM_BATTING_HR * TEAM_BATTING_BB,
     interaction_PITCHING = TEAM_PITCHING_H * TEAM_PITCHING_BB
   )
 
 # Fit a linear regression model with interaction terms
-model_interaction <- lm(TARGET_WINS ~ interaction_BATTING + interaction_PITCHING +
+model_interaction_no_outlier <- lm(TARGET_WINS ~ interaction_BATTING + interaction_PITCHING +
                         TEAM_BATTING_H + TEAM_BATTING_2B + TEAM_BATTING_3B + 
                         TEAM_BATTING_SO + TEAM_BASERUN_SB + TEAM_BASERUN_CS + 
                         TEAM_PITCHING_HR + TEAM_PITCHING_SO + 
                         TEAM_FIELDING_DP + TEAM_FIELDING_E,
-                        data = money_ball_interaction)
+                        data = money_ball_interaction_no_outlier)
 
 # Model summary
-summary(model_interaction)
+# summary(model_interaction_no_outlier)
+```
+
+## Model Evaluation Function
+```{r Model_Evaluation_Function}
+## Model Evaluation Function
+evaluate_model <- function(model, data) {
+  # Predicted values
+  predictions <- predict(model, data)
+  
+  # Actual values (target variable)
+  actuals <- data$TARGET_WINS
+  
+  # Calculate residuals
+  residuals <- actuals - predictions
+  
+  # Calculate metrics
+  r_squared <- summary(model)$r.squared
+  adj_r_squared <- summary(model)$adj.r.squared
+  mse <- mean(residuals^2)
+  rmse <- sqrt(mse)
+  f_statistic <- summary(model)$fstatistic[1]
+  
+  # Print evaluation metrics
+  cat("Model Evaluation Metrics:\n")
+  cat("R-squared: ", r_squared, "\n")
+  cat("Adjusted R-squared: ", adj_r_squared, "\n")
+  cat("MSE: ", mse, "\n")
+  cat("RMSE: ", rmse, "\n")
+  cat("F-statistic: ", f_statistic, "\n")
+  
+  # Generate diagnostic plots for residual analysis
+  par(mfrow = c(2, 2))
+  plot(model)
+  
+  # Return the evaluation metrics in a list
+  return(list(
+    R_squared = r_squared,
+    Adjusted_R_squared = adj_r_squared,
+    MSE = mse,
+    RMSE = rmse,
+    F_statistic = f_statistic
+  ))
+}
+```
+
+
+### Log Ttansformation model Evaluation
+```{r Log_Ttansformation_model_Evaluation}
+evaluation_log <- evaluate_model(model_log, money_ball_log)
+```
+
+### Square Root Transformation Model Evaluation
+```{r Square_Root_Transformation_Model_Evaluation}
+evaluation_sqrt <- evaluate_model(model_sqrt, money_ball_sqrt)
+```
+
+### Interaction Terms Model Evaluation
+```{r}
+evaluation_Interaction_outlier <- evaluate_model(model_interaction_outlier, money_ball_interaction_outlier)
+```
+### Removing Outliers Model Evaluation
+```{r Removing_Outliers_Model_Evaluation}
+evaluation_no_outliers <- evaluate_model(model_no_outliers, money_ball_no_outliers)
+```
+### Outlier Removal and Interaction Terms Model Evaluation
+```{r Outlier_Removal_and_Interaction_Terms_Model_Evaluation}
+evaluation_interaction_no_outlier <- evaluate_model(model_interaction_no_outlier, money_ball_interaction_no_outlier)
 ```
 
