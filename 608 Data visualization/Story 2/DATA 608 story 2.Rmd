@@ -1,0 +1,258 @@
+---
+title: "DATA 608 Assignment"
+author: "Warner Alexis"
+date: "2024-09-23"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Story - 2 : Can the FED Control Inflation and Maintain Full Employment
+
+I am usimng ``fedr`` package to use API to get the Economic Data for this assignment. The API is public and very easy to set up the connection. 
+
+Instruction avalilable on how to load the data here https://github.com/sboysel/fredr
+
+
+
+
+```{r}
+# load library 
+library(fredr)
+library(fredr)
+
+library(tidyverse)
+# Hide Your API
+```
+
+
+The goal of the data collection was to gather 25 years of historical data for the Consumer Price Index (CPI), Federal Funds Rate (FRED), Unemployment Rate, and Inflation Rate. Data for the CPI and Unemployment Rate were sourced from the Bureau of Labor Statistics (BLS), while the Federal Funds Rate and Inflation Rate were obtained from the Federal Reserve Board’s website. This required utilizing two different APIs. Due to the BLS’s policy of limiting data requests to a maximum of 20 years, the code had to be adjusted to combine two separate requests to cover the 25-year span for each dataset. On the other hand, data retrieval from the Federal Reserve Board was streamlined using the fredr package, which made the process straightforward once an API key was acquired.
+
+
+```{r, warning=FALSE}
+# Hide Your API
+FRED_API_KEY=readLines('api.txt')
+
+fredr_set_key(FRED_API_KEY)
+
+
+
+# Fetch Employee Rate for the past 25 years
+unrate_data <- fredr(
+  series_id = "UNRATE",
+  observation_start = as.Date("1999-01-01"),
+  observation_end = as.Date("2024-09-22")
+)
+
+# Fetch Consumer Price Index 
+
+cpi_data <- fredr(
+  series_id = "CPIAUCNS",
+  observation_start = as.Date("1999-01-01"),
+  observation_end = as.Date("2024-09-22"))
+
+# Fetch Personal Consumption Expenditures (PCE) data
+pce_data <- fredr(
+  series_id = "PCE",
+  observation_start = as.Date("1999-01-01"),
+  observation_end = as.Date("2024-09-22"))
+
+# Fetch Inflation Rate
+inflation_data <- fredr(
+  series_id = "FPCPITOTLZGUSA",
+  observation_start = as.Date("1999-01-01"),
+  observation_end = as.Date("2024-09-22"))
+
+```
+
+
+
+
+This graph, titled “Comparison of Unemployment and Inflation Rates 1999 - 2024,” shows the trends of two key economic indicators over a 25-year period. The orange line represents the Unemployment Rate, while the blue line represents the Inflation Rate. Unemployment Rate displays significant peaks around 2003, 2009, and a sharp increase towards 2024. These peaks likely correspond to economic downturns, such as the early 2000s recession and the 2008 financial crisis. Notable peaks are around 2008 and a sharp peak towards 2024 and these peaks might be associated with economic events that caused price levels to rise significantly.
+The graph allows for a visual comparison of how unemployment and inflation rates have moved over time, potentially highlighting periods where these indicators were influenced by similar economic conditions.
+
+```{r}
+# Assuming unrate_data and inflation_data are available and have similar structures
+# Ensure that both datasets have a 'date' and 'value' column for plotting
+
+# Merge the datasets by date for easy plotting
+combined_data <- merge(unrate_data, inflation_data, by = "date", suffixes = c("_unrate", "_inflation"))
+
+# Set up the plot window with sufficient y-limits to fit both series
+plot(combined_data$date, combined_data$value_unrate, type = "l", col = "orange",
+     ylim = range(c(combined_data$value_unrate, combined_data$value_inflation)),
+     ylab = "Rate (%)", xlab = "Date",
+     main = "Comparison of Unemployment and Inflation Rates 1999 - 2024", lwd = 2)
+
+# Add the inflation data to the same plot using lines()
+lines(combined_data$date, combined_data$value_inflation, col = "blue", lwd = 2)
+
+# Add a legend to differentiate between the two lines
+legend("topright", legend = c("Unemployment Rate", "Inflation Rate"),
+       col = c("orange", "blue"), lty = 1, lwd = 2)
+
+# Add a text annotation on the plot
+text(as.Date("2025-09-22"), max(combined_data$value_unrate, combined_data$value_inflation), 
+     "Over a 25-year period, the FED appears to be unable to control rate swings.", 
+     pos = 4, cex = 0.8)
+```
+
+
+
+
+
+```{r}
+# Plot Unemployment Rate
+
+# Set up the plotting area to have 4 rows and 1 column
+par(mfrow = c(4, 1), mar = c(3, 4, 3, 1), oma = c(0, 0, 0, 0))
+
+
+plot(unrate_data$date, unrate_data$value, type = "l", col = "black",
+     ylim = c(0, max(unrate_data$value) + 1),
+     ylab = "UNR (%)", xlab = "", main = "Unemployment Rate")
+
+
+
+# Plot Consumer Price Index
+plot(cpi_data$date, cpi_data$value, type = "l", col = "black",
+     ylim = c(0, max(cpi_data$value) + 1),
+     ylab = "CPI ($)", xlab = "", main = "Consumer Price Index")
+
+
+
+# Plot Personal Consumption Expenditures
+plot(pce_data$date, pce_data$value / 1000, type = "l", col = "black",
+     ylim = c(0, max(pce_data$value / 1000) + 1),
+     ylab = "PCE ($ 000's)", xlab = "", main = "Personal Consumption Expenditures")
+
+
+
+# Plot Inflation Rate
+plot(inflation_data$date, inflation_data$value, type = "l", col = "black",
+     ylim = c(0, max(inflation_data$value) + 1),
+     ylab = "IR (%)", xlab = "", main = "Inflation Rate")
+
+
+
+```
+
+The chart consists of four vertically aligned time series plots illustrating key economic trends over the past 30 years. The **Unemployment Rate (UNR)** fluctuates significantly, with peaks during the 2008 financial crisis and the COVID-19 pandemic, followed by steady recoveries, emphasizing its cyclical nature. In contrast, the **Consumer Price Index (CPI)** and **Personal Consumption Expenditures (PCE)** both exhibit consistent upward trends, indicating long-term inflationary pressures and rising consumer spending, despite minor dips during economic downturns. The **Inflation Rate (IR)**, however, shows greater volatility, with notable spikes in the early 1990s and around 2021–2022 due to global inflationary pressures related to the pandemic. Overall, these trends highlight the complex interplay between unemployment, inflation, and consumer behavior in the U.S. economy, demonstrating how economic crises impact the labor market while inflation and spending continue to rise, influenced by various external factors.
+
+
+
+
+```{r}
+# Function to calculate percentage change from previous year
+calculate_pct_change <- function(data) {
+  data %>%
+    arrange(date) %>%
+    mutate(year = year(date)) %>%
+    group_by(year) %>%
+    summarise(value = mean(value, na.rm = TRUE)) %>%
+    ungroup() %>%
+    mutate(pct_change = (value / lag(value) - 1) * 100) %>%
+    filter(!is.na(pct_change))
+}
+
+## Calculate percentage change for each data set
+unrate_pct_change <- calculate_pct_change(unrate_data)
+cpi_pct_change <- calculate_pct_change(cpi_data)
+pce_pct_change <- calculate_pct_change(pce_data)
+inflation_pct_change <- calculate_pct_change(inflation_data)
+
+## Create the combined data set for the percentage changes
+combined_pct_change <- bind_rows(
+  unrate_pct_change %>% mutate(type = "Unemployment Rate"),
+  cpi_pct_change %>% mutate(type = "Consumer Price Index"),
+  pce_pct_change %>% mutate(type = "Personal Consumption Expenditures"),
+  inflation_pct_change %>% mutate(type = "Inflation Rate")
+)
+
+
+# Add custom labels to the plot
+recession_labels <- data.frame(
+  year = c(2001, 2008, 2020, 2024),
+  label = c("DotCom Recession", "Housing Market Recession", "COVID Recession", "Post COVID"),
+  pct_change = c(20, -625, 925, 275)
+)
+
+
+## Update the color scale order
+color_scale <- scale_color_manual(
+  values = c("#f6cde2", "#b67295", "#a0d4a6", "#709874"),
+  breaks = c("Inflation Rate", "Unemployment Rate", "Personal Consumption Expenditures", "Consumer Price Index")
+)
+
+
+
+
+
+# Calculate the average percentage change per year for the combined dataset
+years <- unique(combined_pct_change$year)
+
+# Create an empty plot
+plot(years, 
+     rep(0, length(years)), 
+     type = "n", 
+     ylim = c(min(combined_pct_change$pct_change, na.rm = TRUE), 
+              max(combined_pct_change$pct_change, na.rm = TRUE)),
+     xlab = "Year", 
+     ylab = "Percentage Change (%)", 
+     main = "Yearly Percentage Change in Economic Indicators 1999 - 2024")
+
+# Define colors for each type
+colors <- c("#f6cde2", "#b67295", "#a0d4a6", "#709874")
+
+# Plot each line
+for (i in 1:length(unique(combined_pct_change$type))) {
+  lines(
+    combined_pct_change$year[combined_pct_change$type == unique(combined_pct_change$type)[i]],
+    combined_pct_change$pct_change[combined_pct_change$type == unique(combined_pct_change$type)[i]],
+    col = colors[i],
+    lwd = 2
+  )
+}
+
+# Add legend
+legend("topright", 
+       legend = unique(combined_pct_change$type), 
+       col = colors, 
+       lty = 1, 
+       lwd = 2)
+
+# Add recession labels
+recession_years <- recession_labels$year
+recession_labels_text <- recession_labels$label
+recession_pct_changes <- recession_labels$pct_change
+
+# Add recession labels to the plot
+text(recession_years, 
+     recession_pct_changes, 
+     labels = recession_labels_text, 
+     pos = 3, 
+     cex = 0.8)
+
+# Add annotation
+text(max(years), max(combined_pct_change$pct_change, na.rm = TRUE), 
+     labels = "FED returns to baseline change rate - particularly after recession events.", 
+     pos = 4, 
+     cex = 0.8)
+```
+
+
+
+
+
+
+The graph illustrates the yearly percentage changes in key economic indicators from 1999 to 2024. The graph tracks the inflation rate, personal consumption expenditures, unemployment rate, and consumer price index. Notable spikes are evident around 2000, 2008, and 2020, corresponding to the dot-com recession, the housing market recession, and the COVID-19 recession, respectively.It highlights the dramatic changes during these economic downturns. this graphs show that personal consumption expenditures and unemployment rates exhibit more pronounced volatility compared to the inflation rate and consumer price index, which are relatively more stable. These visualizations provide a comprehensive view of how major economic events impact various economic indicators over time, allowing for a comparative analysis of their effects across different recessions.
+
+We can say that FED has faced significant challenges, particularly during major economic downturns, the overall trend suggests that it has made substantial efforts to fulfill its mandate.The ability to reduce unemployment and control inflation after economic shocks indicates a level of success in promoting maximum employment and stable prices. However, the sharp increases towards 2024 in both rates highlight ongoing challenges that the FED continues to address. Yes FED has managed to both employment and inflation rates over time. However, the sharp increases towards 2024 indicate ongoing challenges that the FED continues to address.
+
+
+
+
