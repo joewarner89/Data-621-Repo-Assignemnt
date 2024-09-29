@@ -742,24 +742,24 @@ evaluation_interaction_no_outlier <- evaluate_model(model_interaction_no_outlier
 
 ### Are you keeping the model even though it is counter intuitive? Why? The boss needs to know.
 
-Based on the models we have seen, the following variables have coefficients that make sense are the following:
+Based on the models we have analyzed, the following variables have coefficients that make sense:
 
 - TEAM_BATTING_H (Hits): Positive coefficients across models indicate that more hits lead to more wins, which is expected because hits create scoring opportunities.
 
 - TEAM_FIELDING_E (Errors): A negative coefficient for fielding errors is logical since errors typically give opponents extra chances to score, reducing the team's chances of winning.
 
-- TEAM_BASERUN_SB (Stolen Bases): The positive effect on wins is also intuitive, as successful base stealing increases scoring potential.
+- TEAM_BASERUN_SB (Stolen Bases): The positive effect on wins is intuitive, as successful base stealing increases scoring potential.
 
-Despite the counter intuitive nature of keeping the model, I recommend maintaining the "Removing Outliers" model due to its superior performance metrics. This model has the highest R-squared (0.3889) and Adjusted R-squared (0.3831), indicating it explains a significant portion of the variance in the data. Its Mean Squared Error (MSE) of 98.4005 and Root Mean Squared Error (RMSE) of 9.9197 are also the lowest among the models evaluated, suggesting better predictive accuracy. Although the model with interaction terms yielded a slightly higher R-squared (0.3874), its complexity may lead to overfitting and make it less interpretable. Thus, focusing on the model that effectively balances performance and simplicity will provide more reliable insights for decision-making.
+Given the evaluations, we recommend the "Outlier Removal and Interaction Terms" model as the best option. This model has an R-squared of 0.3894 and an Adjusted R-squared of 0.3846, indicating a good level of variance explanation. While its Mean Squared Error (MSE) is 101.5569, and Root Mean Squared Error (RMSE) is 10.07755, the model demonstrates strong predictive capability. Notably, it has the highest F-statistic of 80.30533, suggesting it explains the variance in the outcome variable effectively. Although the "Interaction Terms" model has the highest R-squared (0.3994) and Adjusted R-squared (0.3926), the increased complexity may lead to overfitting and make it less understandable. Therefore, focusing on the "Outlier Removal and Interaction Terms" model effectively balances performance and simplicity, providing more reliable insights for decision-making.
 
 ## Select Models:
 
-For selecting the best multiple linear regression model, I would focus on a balance between performance and simplicity (parsimony). Let's analyze the "Removing Outliers" model and the "Interaction Terms" model based on each criterion:
+For selecting the best multiple linear regression model, I would focus on a balance between performance and simplicity (parsimony). Let's analyze the "Outlier Removal and Interaction Terms" model and the "Interaction Terms" model based on each criterion:
 
-- Performance vs. Parsimony: The "Removing Outliers" model has the highest R-squared value (0.3889) and Adjusted R-squared (0.3831) among all models, indicating it explains a significant portion of the variance. In contrast, the "Interaction Terms" model has a slightly lower R-squared (0.3874) but includes multiple predictors and interaction terms, which can complicate interpretation.
+- Performance vs. Parsimony: The "Outlier Removal and Interaction Terms" model has an R-squared value of 0.3894 and an Adjusted R-squared of 0.3846, indicating it explains a significant portion of the variance. In contrast, the "Interaction Terms" model has a slightly higher R-squared (0.3994) but its increased complexity with multiple predictors and interaction terms can complicate interpretation.
 
-- Mean Squared Error (MSE): The "Removing Outliers" model has a lower MSE (98.4005) compared to the "Interaction Terms" model (100.182), suggesting better predictive accuracy.
+- Mean Squared Error (MSE): The "Outlier Removal and Interaction Terms" model has a higher MSE (101.5569) compared to the "Interaction Terms" model (99.9714), but it demonstrates robust predictive capability despite this difference.
 
-- F-statistics: The "Removing Outliers" model has an F-statistic of 67.90224, while the "Interaction Terms" model has an F-statistic of 57.72305. A higher F-statistic in the "Removing Outliers" model indicates that it explains the variance in the outcome variable more effectively.
+- F-statistics: The "Outlier Removal and Interaction Terms" model has an F-statistic of 80.30533, which is higher than the "Interaction Terms" model's F-statistic of 59.05871. This suggests that the "Outlier Removal and Interaction Terms" model explains the variance in the outcome variable more effectively.
 
-In conclusion, while both models have their merits, the "Removing Outliers" model balances performance and simplicity, making it the preferred choice for reliable insights.
+In conclusion, while both models have their merits, the "Outlier Removal and Interaction Terms" model effectively balances performance and interpretability, making it the preferred choice for reliable insights.
