@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Introduction
+
 In this assignment, I will be exploring, analyzing and modeing the **money ball dataset**. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record
 has the performance of the team for the given year, with all of the statistics adjusted to match the performance of
 a 162 game season. the purpose of this assignment is to build a multiple linear regression model on the training data to predict the number of wins
@@ -762,3 +763,32 @@ For selecting the best multiple linear regression model, we would focus on a bal
 - F-statistics: The "Outlier Removal and Interaction Terms" model has an F-statistic of 80.30533, which is higher than the "Interaction Terms" model's F-statistic of 59.05871. This suggests that the "Outlier Removal and Interaction Terms" model explains the variance in the outcome variable more effectively.
 
 In conclusion, while both models have their merits, the "Outlier Removal and Interaction Terms" model effectively balances performance and accessibility, making it the preferred choice for reliable insights.
+
+## Predictions:
+
+```{r}
+money_ball_eval <- money_ball_eval %>%
+  mutate(
+    interaction_BATTING = TEAM_BATTING_HR * TEAM_BATTING_BB,
+    interaction_PITCHING = TEAM_PITCHING_H * TEAM_PITCHING_BB
+  )
+```
+
+
+```{r}
+# Make predictions using the best model
+predictions <- predict(model_interaction_no_outlier, newdata = money_ball_eval)
+
+# Add predictions to the evaluation dataset
+money_ball_eval$Predicted_Wins <- predictions
+
+# View predictions
+head(money_ball_eval)
+```
+
+```{r}
+# Save the evaluation data with predictions to a CSV file
+write.csv(money_ball_eval, "money_ball_eval_with_predictions.csv", row.names = FALSE)
+```
+
+
