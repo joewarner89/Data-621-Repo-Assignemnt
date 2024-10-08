@@ -1,0 +1,211 @@
+---
+title: "DATA 621 Assignment 2"
+author: "Warner Alexis"
+date: "2024-10-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Overview
+
+In this homework assignment, you will work through various classification metrics. You will be asked to create functions in R to carry out the various calculations. You will also investigate some functions in packages that will let you obtain the equivalent results. Finally, you will create graphical output that also can be used to evaluate the output of classification models, such as binary logistic regression.
+
+
+The data set has three key columns we will use:
+> class: the actual class for the observation
+
+> scored.class: the predicted class for the observation (based on a threshold of 0.5)
+
+> scored.probability: the predicted probability of success for the observation
+
+Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?
+
+```{r}
+# Load library
+library(DataExplorer)
+library(dplyr)
+library(caret)
+library(MASS)
+
+# Laod the dataset 
+datac <- read.csv('classification-output-data.csv', stringsAsFactors = F)
+head(datac)
+str(datac)
+```
+
+
+
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.
+
+> $𝐴𝑐𝑐𝑢𝑟𝑎𝑐𝑦= 𝑇𝑃+𝑇𝑁𝑇𝑃+𝐹𝑃+𝑇𝑁+𝐹𝑁$ 
+
+4. Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions.
+
+ $𝐶𝑙𝑎𝑠𝑠𝑖𝑓𝑖𝑐𝑎𝑡𝑖𝑜𝑛 𝐸𝑟𝑟𝑜𝑟 𝑅𝑎𝑡𝑒= (𝐹𝑃+𝐹𝑁)/(𝑇𝑃+𝐹𝑃+𝑇𝑁+𝐹𝑁) $
+ 
+ 
+ 
+```{r}
+# create a model 
+conf_matrix <- table(datac$class, datac$scored.class)
+conf_matrix
+conf_matrix[1,1]
+
+
+## Let do it on caret 
+data <- datac
+data$class <- as.factor(data$class)
+data$scored.class <- as.factor(data$scored.class)
+# use function in caret package to do it 
+confusion <- confusionMatrix(data$scored.class, data$class, positive= '1')
+
+get_Accuracy <- function(confusion_matrix){
+  TN <- confusion_matrix[1,1] # True Negative
+  FP <- confusion_matrix[1,2] # False Positive
+  FN <- confusion_matrix[2,1] # False Negative
+  TP <- confusion_matrix[2,2] # True Positive
+  
+  # calculate accuracy 
+  accuracy <- (TP + TN) / (TP + TN + FP + FN)
+  
+  # Classification Error Rate 
+  class_err_rate <- (FP + FN) / (TP + FP + TN + FN)
+  
+  # Use cat() to print multiple values
+  cat('The accuracy is: ', accuracy, '\n')
+  cat('The Classification Error Rate is: ', class_err_rate, '\n')
+  cat('The sum of both accuracy and classification error is ', sum(accuracy, class_err_rate))
+}
+
+get_Accuracy(conf_matrix)
+precision(data = as.factor(datac$scored.class), 
+          reference = as.factor(datac$class),
+          positive = '0')
+
+```
+ 
+ 
+5 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
+
+$𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛= 𝑇𝑃/(𝑇𝑃+𝐹𝑃)$
+
+
+
+
+```{r}
+
+get_precision <- function(confusion_matrix){
+  TN <- confusion_matrix[1,1] # True Negative
+  FP <- confusion_matrix[1,2] # False Positive
+  FN <- confusion_matrix[2,1] # False Negative
+  TP <- confusion_matrix[2,2] # True Positive
+  
+  # calculate accuracy 
+  precision <-  (TP)/ (TP + FP)
+  
+  
+  
+  # Use cat() to print multiple values
+  cat('The precision is: ', precision, '\n')
+  
+}
+get_precision(conf_matrix)
+# other way to calculated 
+caret_precision <- confusion$byClass['Precision']
+caret_precision
+```
+
+
+5 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
+
+$𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦= 𝑇𝑃/(𝑇𝑃+𝐹𝑁)$
+
+
+```{r}
+# sensitivity 
+get_sensitivity <- function(confusion_matrix){
+  TN <- confusion_matrix[1,1] # True Negative
+  FP <- confusion_matrix[1,2] # False Positive
+  FN <- confusion_matrix[2,1] # False Negative
+  TP <- confusion_matrix[2,2] # True Positive
+  
+  # calculate accuracy 
+  sensitivity <-  (TP)/ (TP + FN)
+  
+  
+  
+  # Use cat() to print multiple values
+  cat('The Sensitivity is: ', sensitivity, '\n')
+  
+}
+get_sensitivity(conf_matrix)
+# other way to calculated 
+caret_sensitivity <- confusion$byClass['Sensitivity']
+caret_sensitivity
+```
+
+6 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the specificity of the predictions.
+$ 𝑆𝑝𝑒𝑐𝑖𝑓𝑖𝑐𝑖𝑡𝑦= 𝑇𝑁/(T𝑁+𝐹𝑃)$
+
+```{r}
+
+# specificity
+get_specificity <- function(confusion_matrix){
+  TN <- confusion_matrix[1,1] # True Negative
+  FP <- confusion_matrix[1,2] # False Positive
+  FN <- confusion_matrix[2,1] # False Negative
+  TP <- confusion_matrix[2,2] # True Positive
+  
+  # calculate specificity
+  specificity <-  (TN)/ (TN + FP)
+  
+  
+  
+  # Use cat() to print multiple values
+  cat('The specificity is: ', specificity, '\n')
+  
+}
+get_specificity(conf_matrix)
+# other way to calculated 
+caret_specificity <- confusion$byClass['Specificity']
+caret_specificity
+```
+
+
+
+
+8 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions.
+
+$𝐹1 𝑆𝑐𝑜𝑟𝑒= 2(𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛×𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦)/(𝑃𝑟𝑒𝑐𝑖𝑠𝑖𝑜𝑛+𝑆𝑒𝑛𝑠𝑖𝑡𝑖𝑣𝑖𝑡𝑦)$
+
+```{r}
+
+# F1 score
+
+get_f1_score <- function(confusion_matrix){
+  TN <- confusion_matrix[1,1] # True Negative
+  FP <- confusion_matrix[1,2] # False Positive
+  FN <- confusion_matrix[2,1] # False Negative
+  TP <- confusion_matrix[2,2] # True Positive
+  
+  # calculate specificity
+  # calculate precision 
+  precision <-  (TP)/ (TP + FP)
+  # calculate sensitivity 
+  sensitivity <-  (TP)/ (TP + FN)
+  
+  # calculate f1_score
+  f1_score <- 2*(precision * sensitivity)/(precision + sensitivity)
+  
+  # Use cat() to print multiple values
+  cat('The F1 score is: ', f1_score, '\n')
+  
+}
+get_f1_score(conf_matrix)
+```
+
