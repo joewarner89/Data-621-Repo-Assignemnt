@@ -6,21 +6,21 @@ output:
   html_document:
     toc: true
     toc_float: true
-    toc_depth: 4
+    toc_depth: 3
   pdf_document:
     toc: true
-    toc_depth: '4'
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Abstract:
+# Abstract:
 
 This assignment explores the application of various classification models to a dataset, with an emphasis on data preparation, model selection, and performance evaluation. The methodologies employed include transforming variables, calculating statistical metrics, and utilizing different modeling approaches. Despite some interesting findings, the analysis revealed areas needing clarification, particularly in the justification of methods and criteria for model comparison. This work aims to provide a comprehensive overview of the steps taken and the rationale behind each choice, ultimately leading to a better understanding of the model-building process and its implications for predictive analytics.
 
-## Introduction:
+# Introduction:
 
 In the field of data science, classification models play a fundamental role in predicting categorical outcomes, making them indispensable tools in a wide range of applications, from medical diagnosis to customer segmentation. This assignment delves into the key metrics used to evaluate classification models, focusing on both the theoretical underpinnings and practical implementation of these metrics in R. By analyzing the performance of a binary classification model, this work aims to build a comprehensive understanding of core classification metrics and their implications for model evaluation.
 
@@ -30,7 +30,7 @@ To enhance this analysis, packages such as `caret` and `pROC` are explored for t
 
 Through this investigation, the assignment not only emphasizes the importance of accurate classification but also highlights the practical aspects of working with classification models in R. By creating graphical outputs and systematically evaluating metrics, this work seeks to enhance understanding of how various performance measures contribute to a more nuanced assessment of model efficacy and reliability in predictive analytics.
 
-## Load the libraries
+# Load the libraries
 
 ```{r}
 # Load required libraries
