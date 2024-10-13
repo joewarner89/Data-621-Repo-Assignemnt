@@ -3,13 +3,13 @@ title: "DATA 621 Homework 2"
 author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-10-08"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '4'
   html_document:
     toc: true
     toc_float: true
     toc_depth: 4
-  pdf_document:
-    toc: true
-    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
@@ -672,11 +672,14 @@ grid.arrange(pROC_plot, custom_plot, ncol = 2)
 # Generate ROC curve using pROC
 roc_result <- roc(classification_data$class, classification_data$scored.probability)
 
-# Plot the ROC curve
-plot(roc_result, col = "blue", lwd = 2, main = "ROC Curve with AUC")
-auc_value <- auc(roc_result)  # Calculate AUC
-cat(sprintf("AUC: %.3f\n", auc_value))
+# Plot the ROC curve with correct x-axis (1 - specificity)
+plot(1 - roc_result$specificities, roc_result$sensitivities, type = "l", 
+     col = "blue", lwd = 2, xlab = "1 - Specificity (False Positive Rate)", 
+     ylab = "Sensitivity (True Positive Rate)", main = "ROC Curve with AUC")
 
+# Calculate and print AUC
+auc_value <- auc(roc_result)
+cat(sprintf("AUC: %.3f\n", auc_value))
 ```
 
 **Why is this reversed compare to 10.ROC Curve And AUC?** **What does it represent?**
