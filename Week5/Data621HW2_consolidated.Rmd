@@ -754,9 +754,6 @@ The Lift Chart measures the improvement in model performance over random selecti
 Both charts indicate that the model is effective at identifying true positives early, with strong gains and lift in the top portion of predictions.
 
 ```{r}
-# Load ggplot2 for plotting
-library(ggplot2)
-
 # Plot Gain Chart
 ggplot(gain_lift_data, aes(x = decile_percentage, y = cumulative_gain)) +
   geom_line(color = "blue") +
