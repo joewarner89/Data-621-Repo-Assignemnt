@@ -167,37 +167,7 @@ cat(sprintf("accuracy: %.4f\n", accuracy))
 ```
 **What does accuracy tells us base on the results???**
 
-
-Instead, we can do:
-
-```{r}
-# Custom accuracy function with additional print statements for TP, TN, FP, FN
-custom_accuracy <- function(data) {
-  # Calculate TP, TN, FP, and FN
-  TP <- sum(data$class == 1 & data$scored.class == 1)
-  TN <- sum(data$class == 0 & data$scored.class == 0)
-  FP <- sum(data$class == 0 & data$scored.class == 1)
-  FN <- sum(data$class == 1 & data$scored.class == 0)
-  
-  # Print individual components for clarity
-  cat("True Positives (TP):", TP, "\n")
-  cat("True Negatives (TN):", TN, "\n")
-  cat("False Positives (FP):", FP, "\n")
-  cat("False Negatives (FN):", FN, "\n")
-  
-  # Calculate accuracy
-  accuracy <- (TP + TN) / (TP + FP + TN + FN)
-  return(accuracy)
-}
-
-# Calculate and print the accuracy
-accuracy <- custom_accuracy(classification_data)
-cat(sprintf("Accuracy: %.4f\n", accuracy))
-
-# Verify with caret's confusionMatrix for comparison
-caret_conf_matrix <- confusionMatrix(classification_data$scored.class, classification_data$class, positive = "1")
-cat("\nCaret Accuracy:", caret_conf_matrix$overall['Accuracy'], "\n")
-```
+The accuracy of 80.66% indicates that the model correctly classified approximately 81% of the observations in the dataset. This metric gives a general sense of the model’s overall effectiveness, showing that it performs reasonably well in terms of total correct classifications.
 
 
 ## 4. Classification Error Rate
@@ -224,33 +194,7 @@ cat(sprintf("Sum of Accuracy and Classification Error Rate: %.2f\n", accuracy + 
 
 **What does this Error Rate tells us???**
 
-
-INSTEAD, we may do
-
-```{r}
-# Classification Error Rate function with additional print statements for FP and FN
-error_rate <- function(data) {
-  TP <- sum(data$class == 1 & data$scored.class == 1)
-  TN <- sum(data$class == 0 & data$scored.class == 0)
-  FP <- sum(data$class == 0 & data$scored.class == 1)
-  FN <- sum(data$class == 1 & data$scored.class == 0)
-  
-  # Print individual components for clarity
-  cat("False Positives (FP):", FP, "\n")
-  cat("False Negatives (FN):", FN, "\n")
-  
-  # Calculate error rate
-  error_rate <- (FP + FN) / (TP + FP + TN + FN)
-  return(error_rate)
-}
-
-# Calculate and print the classification error rate
-error_rate <- error_rate(classification_data)
-cat(sprintf("Classification Error Rate: %.4f\n", error_rate))
-
-# Compare the sum of accuracy and error rate
-cat(sprintf("Sum of Accuracy and Classification Error Rate: %.2f\n", accuracy + error_rate))
-```
+The classification error rate of 0.1934 indicates that approximately 19.34% of the model’s predictions were incorrect. In other words, the model misclassified around one-fifth of the observations in the dataset. This error rate tells us how often the model is making mistakes. Specifically, it reflects the proportion of instances where the model’s predicted class did not match the actual class. While the error rate is lower than 20%, which is not excessively high, it still highlights that there is room for improvement in the model’s performance.
 
 
 ## 5. Precision
@@ -269,25 +213,7 @@ cat(sprintf("precision: %.4f\n", precision))
 ```
 **What does this precision tells us???**
 
-
-INSTEAD, we can:
-
-```{r}
-# Precision Function
-custom_precision <- function(data) {
-  TP <- sum(data$class == 1 & data$scored.class == 1)
-  FP <- sum(data$class == 0 & data$scored.class == 1)
-  precision <- TP / (TP + FP)
-  
-  # Print statement for clarity
-  cat(sprintf("Precision: %.4f - Proportion of positive predictions that are correct.\n", precision))
-  
-  return(precision)
-}
-precision <- custom_precision(classification_data)
-cat(sprintf("Precision: %.4f\n", precision))
-```
-**What does this precision tells us???**
+The precision of 0.8438 (or 84.38%) indicates that when the model predicts a positive class (1), it is correct 84.38% of the time. In other words, precision reflects the proportion of true positive predictions out of all the instances where the model predicted positive.
 
 
 ## 6. Sensitivity (Recall)
@@ -304,30 +230,11 @@ custom_sensitivity <- function(data) {
 sensitivity <- custom_sensitivity(classification_data)
 recall = sensitivity
 
-cat(sprintf("precision (recall): %.4f\n", sensitivity))
+cat(sprintf("sensitivity (recall): %.4f\n", sensitivity))
 ```
 **What does this precision tells us - what the results are about???**
 
-
-
-INSTEAD,
-
-```{r}
-# Sensitivity (Recall) Function
-custom_sensitivity <- function(data) {
-  TP <- sum(data$class == 1 & data$scored.class == 1)
-  FN <- sum(data$class == 1 & data$scored.class == 0)
-  sensitivity <- TP / (TP + FN)
-  
-  # Print statement for clarity
-  cat(sprintf("Sensitivity (Recall): %.4f - Proportion of actual positives that are correctly identified.\n", sensitivity))
-  
-  return(sensitivity)
-}
-
-sensitivity <- custom_sensitivity(classification_data)
-cat(sprintf("Sensitivity (Recall): %.4f\n", sensitivity))
-```
+The value 0.4737 (or 47.37%) here is actually the sensitivity (or recall), not precision. This sensitivity score tells us that the model correctly identifies only 47.37% of actual positive cases. In other words, of all the instances where the actual class is positive, the model is correctly predicting positive in about half of those cases. This low sensitivity suggests that the model is not very effective at identifying positive cases and is likely missing a significant number of them.
 
 
 ## 7. Specificity
@@ -365,32 +272,7 @@ cat(sprintf("F1 Score: %.4f\n", f1score))
 ```
 **What does this score tells us???**
 
-
-INSTEAD of passing the precision and sensitivty to the function as parameters, we can have them to be calculated wihtin the function:
-
-```{r}
-# F1 Score Function
-custom_f1_score <- function(data) {
-  TP <- sum(data$class == 1 & data$scored.class == 1)
-  FP <- sum(data$class == 0 & data$scored.class == 1)
-  FN <- sum(data$class == 1 & data$scored.class == 0)
-  
-  # Calculate precision and sensitivity
-  precision <- TP / (TP + FP)
-  sensitivity <- TP / (TP + FN)
-  
-  # Calculate F1 Score
-  if (precision + sensitivity == 0) {
-    return(0)  # Avoid division by zero
-  }
-  
-  f1score <- 2 * (precision * sensitivity) / (precision + sensitivity)
-  
-  return(f1score)
-}
-f1score <- custom_f1_score(classification_data)
-cat(sprintf("F1 Score: %.4f\n", f1score))
-```
+The F1 score of 60.67% indicates a moderate balance between the precision (84.38%) and recall (47.37%) of the model. While precision is relatively high, the low recall lowers the F1 score, indicating that the model is missing many true positives even though it has a high accuracy when it does predict positive.
 
 
 ## 9 Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 \< 𝑎 \< 1 and 0 \< 𝑏 \< 1 then 𝑎𝑏 \< 𝑎.)
@@ -507,7 +389,7 @@ print(paste("AUC:", round(auc,4)))
 **What does this  tells us???**
 **why another one (reversed) at overview section below?**
 
-
+The ROC curve presents an overall moderate performance of the classification model, initially starting along the diagonal line, indicating that it struggles to differentiate between positive and negative classes at lower thresholds. However, the presence of a small vertical line suggests some improvement in true positive rates as the threshold is adjusted, followed by a stable period where sensitivity does not significantly increase. The longer vertical line (that reaches around 0.4) demonstrates a substantial gain in identifying true positives with minimal increases in false positives, indicating the model becomes more effective at this threshold. The random pattern of the curve signifies that while the model improves with certain threshold adjustments, it eventually reaches a point at (1,1) where it classifies all positives correctly, even though with potential misclassifications of negatives. Overall, the curve highlights areas for enhancing the model's initial classification ability while suggesting that optimal threshold selection is crucial for balancing sensitivity and specificity.
 
 ## 11. Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.
 
@@ -748,6 +630,22 @@ cat(sprintf("AUC: %.3f\n", auc_value))
 **What does it represent?**
 
 
+```{r}
+roc_result <- roc(classification_data$class, classification_data$scored.probability)
+
+# Extract FPR and TPR
+fpr <- roc_result$specificities
+tpr <- roc_result$sensitivities
+
+# Custom plot
+plot(fpr, tpr, type = "l", col = "blue", lwd = 2, xlim = c(0, 1), ylim = c(0, 1),
+     xlab = "False Positive Rate", ylab = "True Positive Rate", main = "ROC Curve with AUC")
+abline(a = 0, b = 1, lty = 2)  # Add diagonal line
+auc_value <- auc(roc_result)  # Calculate AUC
+cat(sprintf("AUC: %.3f\n", auc_value))
+```
+
+The ROC curve's shape suggests a mixed performance of the classification model. Starting at (0, 1) indicates perfect sensitivity with a threshold of 0, but the curve remains stable horizontally until around a false positive rate of 0.4, where it begins to decline, signaling that higher thresholds lead to increased misclassification of positive instances. The curve's touch with the diagonal line reflects a performance level similar to random guessing, indicating that the model struggles to distinguish between classes effectively. As it zigzags below the diagonal, this suggests that at certain thresholds, the model performs worse than random chance, highlighting its limitations. The final vertical drop to (1, 0) reinforces the idea that a threshold of 1 results in no positive identifications. Overall, this behavior suggests the need for further exploration of optimal thresholds and potential adjustments to improve model robustness and predictive performance.
 
 ### b. Gain and Lift Charts.
 
