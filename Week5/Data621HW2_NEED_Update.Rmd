@@ -3,9 +3,13 @@ title: "DATA 621 Homework 2"
 author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-10-08"
 output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
   pdf_document:
-    latex_engine: xelatex
-  html_document: default
+    toc: true
+    toc_depth: '4'
 ---
 
 ```{r setup, include=FALSE}
@@ -25,7 +29,6 @@ The dataset used contains observed and predicted class labels, as well as predic
 To enhance this analysis, packages such as `caret` and `pROC` are explored for their built-in functions, which serve as benchmarks for comparing the results of custom-built functions. This comparison provides a basis for understanding both the underlying logic of these metrics and the potential variations that may arise from different computational methods.
 
 Through this investigation, the assignment not only emphasizes the importance of accurate classification but also highlights the practical aspects of working with classification models in R. By creating graphical outputs and systematically evaluating metrics, this work seeks to enhance understanding of how various performance measures contribute to a more nuanced assessment of model efficacy and reliability in predictive analytics.
-
 
 ## Load the libraries
 
@@ -165,10 +168,10 @@ accuracy <- custom_accuracy(classification_data)
 cat(sprintf("accuracy: %.4f\n", accuracy))
 
 ```
+
 **What does accuracy tells us base on the results???**
 
 The accuracy of 80.66% indicates that the model correctly classified approximately 81% of the observations in the dataset. This metric gives a general sense of the model’s overall effectiveness, showing that it performs reasonably well in terms of total correct classifications.
-
 
 ## 4. Classification Error Rate
 
@@ -196,7 +199,6 @@ cat(sprintf("Sum of Accuracy and Classification Error Rate: %.2f\n", accuracy + 
 
 The classification error rate of 0.1934 indicates that approximately 19.34% of the model’s predictions were incorrect. In other words, the model misclassified around one-fifth of the observations in the dataset. This error rate tells us how often the model is making mistakes. Specifically, it reflects the proportion of instances where the model’s predicted class did not match the actual class. While the error rate is lower than 20%, which is not excessively high, it still highlights that there is room for improvement in the model’s performance.
 
-
 ## 5. Precision
 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
@@ -211,10 +213,10 @@ custom_precision <- function(data) {
 precision <- custom_precision(classification_data)
 cat(sprintf("precision: %.4f\n", precision))
 ```
+
 **What does this precision tells us???**
 
 The precision of 0.8438 (or 84.38%) indicates that when the model predicts a positive class (1), it is correct 84.38% of the time. In other words, precision reflects the proportion of true positive predictions out of all the instances where the model predicted positive.
-
 
 ## 6. Sensitivity (Recall)
 
@@ -232,10 +234,10 @@ recall = sensitivity
 
 cat(sprintf("sensitivity (recall): %.4f\n", sensitivity))
 ```
+
 **What does this precision tells us - what the results are about???**
 
 The value 0.4737 (or 47.37%) here is actually the sensitivity (or recall), not precision. This sensitivity score tells us that the model correctly identifies only 47.37% of actual positive cases. In other words, of all the instances where the actual class is positive, the model is correctly predicting positive in about half of those cases. This low sensitivity suggests that the model is not very effective at identifying positive cases and is likely missing a significant number of them.
-
 
 ## 7. Specificity
 
@@ -270,10 +272,10 @@ f1score <- custom_f1_score(classification_data)
 cat(sprintf("F1 Score: %.4f\n", f1score))
 
 ```
+
 **What does this score tells us???**
 
 The F1 score of 60.67% indicates a moderate balance between the precision (84.38%) and recall (47.37%) of the model. While precision is relatively high, the low recall lowers the F1 score, indicating that the model is missing many true positives even though it has a high accuracy when it does predict positive.
-
 
 ## 9 Before we move on, let’s consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1. (Hint: If 0 \< 𝑎 \< 1 and 0 \< 𝑏 \< 1 then 𝑎𝑏 \< 𝑎.)
 
@@ -386,8 +388,8 @@ print(paste("AUC:", round(auc,4)))
 
 
 ```
-**What does this  tells us???**
-**why another one (reversed) at overview section below?**
+
+**What does this tells us???** **why another one (reversed) at overview section below?**
 
 The ROC curve presents an overall moderate performance of the classification model, initially starting along the diagonal line, indicating that it struggles to differentiate between positive and negative classes at lower thresholds. However, the presence of a small vertical line suggests some improvement in true positive rates as the threshold is adjusted, followed by a stable period where sensitivity does not significantly increase. The longer vertical line (that reaches around 0.4) demonstrates a substantial gain in identifying true positives with minimal increases in false positives, indicating the model becomes more effective at this threshold. The random pattern of the curve signifies that while the model improves with certain threshold adjustments, it eventually reaches a point at (1,1) where it classifies all positives correctly, even though with potential misclassifications of negatives. Overall, the curve highlights areas for enhancing the model's initial classification ability while suggesting that optimal threshold selection is crucial for balancing sensitivity and specificity.
 
@@ -431,7 +433,7 @@ print(metrics_df)
 
 ## 12. Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and specificity. Apply the functions to the data set. How do the results compare with your own functions?
 
-### Step 1: Use caret Functions for Classification Metrics and Compare with Custom Functions
+- Step 1: Use caret Functions for Classification Metrics and Compare with Custom Functions
 
 The **caret functions** and **custom functions** for calculating classification metrics such as **sensitivity** and **specificity** provide similar results, but with a key difference in how they treat the positive class. In the first instance, the **caret** function considered the class labeled as **0** as the positive class by default, which is evident from the output where **Sensitivity** was **95.97%** (high sensitivity for detecting class 0).
 
@@ -470,7 +472,7 @@ cat(sprintf("Caret Specificity: %.2f vs Custom Specificity: %.2f\n", caret_speci
 
 ```
 
-### Step 2: Re-order the Factors and Compare with Custom Functions
+- Step 2: Re-order the Factors and Compare with Custom Functions
 
 ```{r}
 # Ensure that the predicted class and actual class are factors
@@ -513,7 +515,7 @@ In terms of the ROC curves, both plots exhibit a similar shape, showing that bot
 
 Thus, the pROC package produces almost identical results compared to the custom function, but pROC is more efficient and robust due to its specialized algorithms.
 
-### Step 1: Generate the ROC Curve with pROC
+- Step 1: Generate the ROC Curve with pROC
 
 ```{r}
 # Use pROC to generate the ROC curve
@@ -525,7 +527,7 @@ cat(sprintf("pROC AUC: %.4f\n", pROC_auc))
 
 ```
 
-### Step 2: Custom ROC Curve and AUC Calculation
+- Step 2: Custom ROC Curve and AUC Calculation
 
 ```{r}
 # Subset the auc from the custom ROC function
@@ -535,7 +537,7 @@ cat(sprintf("Custom AUC: %.4f\n", auc))
 
 ```
 
-### Step 3: compare the pROC AUC with the custom AUC
+- Step 3: compare the pROC AUC with the custom AUC
 
 ```{r}
 # Compare AUC values
@@ -614,7 +616,7 @@ grid.arrange(pROC_plot, custom_plot, ncol = 2)
 
 ## Overview: Plotting graphical outputs that help evaluate the performance of classification models (such as binary logistic regression)
 
-### a. ROC Curve: A plot of the true positive rate (sensitivity) vs. false positive rate (1-specificity) at various thresholds.
+### i. ROC Curve: A plot of the true positive rate (sensitivity) vs. false positive rate (1-specificity) at various thresholds.
 
 ```{r}
 # Generate ROC curve using pROC
@@ -626,9 +628,8 @@ auc_value <- auc(roc_result)  # Calculate AUC
 cat(sprintf("AUC: %.3f\n", auc_value))
 
 ```
-**Why is this reversed compare to 10.ROC Curve And AUC?**
-**What does it represent?**
 
+**Why is this reversed compare to 10.ROC Curve And AUC?** **What does it represent?**
 
 ```{r}
 roc_result <- roc(classification_data$class, classification_data$scored.probability)
@@ -647,7 +648,7 @@ cat(sprintf("AUC: %.3f\n", auc_value))
 
 The ROC curve's shape suggests a mixed performance of the classification model. Starting at (0, 1) indicates perfect sensitivity with a threshold of 0, but the curve remains stable horizontally until around a false positive rate of 0.4, where it begins to decline, signaling that higher thresholds lead to increased misclassification of positive instances. The curve's touch with the diagonal line reflects a performance level similar to random guessing, indicating that the model struggles to distinguish between classes effectively. As it zigzags below the diagonal, this suggests that at certain thresholds, the model performs worse than random chance, highlighting its limitations. The final vertical drop to (1, 0) reinforces the idea that a threshold of 1 results in no positive identifications. Overall, this behavior suggests the need for further exploration of optimal thresholds and potential adjustments to improve model robustness and predictive performance.
 
-### b. Gain and Lift Charts.
+### ii. Gain and Lift Charts.
 
 Create **Gain** and **Lift Charts** based on the output of the classification model.
 
@@ -661,7 +662,7 @@ Create **Gain** and **Lift Charts** based on the output of the classification mo
 -   Calculate cumulative gains and lift for each group.
 -   Plot Gain and Lift charts.
 
-#### i. Create Custom Function to Calculate Gain and Lift
+#### a. Create Custom Function to Calculate Gain and Lift
 
 ```{r}
 # Custom Gain and Lift Chart function
@@ -689,13 +690,13 @@ gain_lift_data <- custom_gain_lift(classification_data)
 
 ```
 
-#### ii. Plot the Gain and Lift Charts
+#### b. Plot the Gain and Lift Charts
 
-##### a. Gain Chart:
+##### b-1. Gain Chart:
 
 The Gain Chart shows the cumulative gain in identifying true positives as more of the population is sampled based on predicted probability. A steep initial rise indicates that the model captures a large portion of positives early, for example, the top 25% of the sample captures about 75% of the positives. The chart outperforms the baseline (red dashed line), demonstrating that the model is more effective than random guessing.
 
-##### b. Lift Chart:
+##### b-2. Lift Chart:
 
 The Lift Chart measures the improvement in model performance over random selection. A lift of 3 at the start means the model is three times better at identifying positives than random selection in the top deciles. As more of the sample is included, the lift decreases and eventually converges toward 1, indicating no advantage over random selection for the entire population.
 
@@ -720,7 +721,7 @@ ggplot(gain_lift_data, aes(x = decile_percentage, y = lift)) +
   theme_minimal()
 ```
 
-#### iii. Kolmogorov-Smirnov (K-S) Chart
+#### c. Kolmogorov-Smirnov (K-S) Chart
 
 The K-S Chart shows a **K-S statistic of 0.58**, indicating the model effectively separates positive and negative classes. The **green line (Sensitivity)** rises sharply, capturing positives early, while the **blue line (1-Specificity)** increases more slowly, meaning fewer false positives initially. The large gap between the lines reflects good model performance.
 
@@ -772,7 +773,7 @@ cat(sprintf("K-S Statistic: %.4f\n", ks_statistic))
 
 ```
 
-#### iv. Plot ROC Curve
+#### d. Plot ROC Curve
 
 The **ROC Chart** shows the model's ability to distinguish between positive and negative classes. The **AUC of 0.85** indicates a strong model performance, as it is close to 1. The curve's sharp rise near the y-axis shows high sensitivity with a low false positive rate initially, suggesting the model performs well at identifying true positives. Overall, the model is effective at classification. The larger shaded area indicates better performance, with the maximum possible AUC being 1 (perfect classification).
 
@@ -813,7 +814,6 @@ legend("bottomright", legend = paste("AUC =", round(auc_value, 2)), col = "blue"
 
 ```
 
-
 # Conclusion:
 
 In this assignment, we examined the performance of a binary classification model using various metrics and custom R functions, as well as functions from the caret and pROC packages for comparison. The model demonstrated an overall accuracy of 80.66%, indicating that it correctly classified a substantial portion of the observations. However, a closer look at the sensitivity (47.37%) and specificity (95.97%) reveals a significant imbalance in the model’s ability to correctly identify positive versus negative cases. This suggests that while the model effectively recognizes negative instances, it struggles to capture true positives, which is reflected in the lower sensitivity.
@@ -823,4 +823,3 @@ The precision of 84.38% indicates that when the model predicted a positive class
 The comparison between the custom functions and the caret package yielded consistent results for accuracy and specificity, though there were some expected variations in sensitivity and other derived metrics. This demonstrates that the custom functions provide reliable metrics, confirming their utility for future analyses where package tools may not be available.
 
 In summary, this analysis highlights the strengths and weaknesses of the classification model, particularly in its handling of imbalanced classes. For future work, it may be beneficial to adjust the threshold or explore alternative models that prioritize recall, especially in scenarios where accurately identifying positives is critical. Overall, this assignment provides a thorough understanding of the importance of each classification metric and reinforces the value of combining custom analysis with package-based validation to achieve robust model evaluation.
-
