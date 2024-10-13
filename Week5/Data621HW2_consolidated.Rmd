@@ -829,41 +829,45 @@ cat(sprintf("K-S Statistic: %.4f\n", ks_statistic))
 The **ROC Chart** shows the model's ability to distinguish between positive and negative classes. The **AUC of 0.85** indicates a strong model performance, as it is close to 1. The curve's sharp rise near the y-axis shows high sensitivity with a low false positive rate initially, suggesting the model performs well at identifying true positives. Overall, the model is effective at classification. The larger shaded area indicates better performance, with the maximum possible AUC being 1 (perfect classification).
 
 ```{r}
-# Assuming you have classification data with 'scored.probability' and 'class' variables
 # Create the ROC curve object
 roc_obj <- roc(classification_data$class, classification_data$scored.probability)
 
-# Plot the ROC curve
-plot(roc_obj, main = "ROC Chart")
+# Plot the ROC curve with the x-axis going from 0 to 1
+plot(1 - roc_obj$specificities, roc_obj$sensitivities, type = "l", 
+     xlab = "1 - Specificity (False Positive Rate)", ylab = "Sensitivity (True Positive Rate)",
+     main = "ROC Chart", col = "blue")
 
 # Add AUC to the plot
 auc_value <- auc(roc_obj)
 legend("bottomright", legend = paste("AUC =", round(auc_value, 2)), col = "blue", lty = 1)
 
 # Highlight the Area Under the Curve (AUC)
-auc_value <- auc(roc_obj)
-polygon(c(0, roc_obj$specificities, 1), c(0, roc_obj$sensitivities, 0), col = rgb(0, 0, 1, 0.2), border = NA)
+polygon(c(0, 1 - roc_obj$specificities, 1), c(0, roc_obj$sensitivities, 0), 
+        col = rgb(0, 0, 1, 0.2), border = NA)
 
 # Add AUC value in the legend
 legend("bottomright", legend = paste("AUC =", round(auc_value, 2)), col = "blue", lty = 1)
-
 ```
 
+The ROC curve above visually represents the trade-off between the sensitivity (true positive rate) and 1 - specificity (false positive rate) across various decision thresholds for a binary classifier. Each point on the curve corresponds to a specific threshold, illustrating how the model balances between correctly identifying positive instances and minimizing false positives. The curve is near the diagonal line which indicates poor performance, similar to random guessing.
+
 ```{r}
-# Assuming classification_data with 'scored.probability' and 'class'
 roc_obj <- roc(classification_data$class, classification_data$scored.probability)
 
-# Plot the ROC curve
-plot(roc_obj, main = "ROC Curve with AUC Highlight", col = "blue")
+# Plot the ROC curve (with correct x-axis direction)
+plot(1 - roc_obj$specificities, roc_obj$sensitivities, type = "l", 
+     xlab = "1 - Specificity (False Positive Rate)", ylab = "Sensitivity (True Positive Rate)",
+     main = "ROC Curve with AUC Highlight", col = "blue")
 
 # Highlight the Area Under the Curve (AUC)
 auc_value <- auc(roc_obj)
-polygon(c(0, roc_obj$specificities, 1), c(0, roc_obj$sensitivities, 0), col = rgb(0, 0, 1, 0.2), border = NA)
+polygon(c(0, 1 - roc_obj$specificities, 1), c(0, roc_obj$sensitivities, 0), col = rgb(0, 0, 1, 0.2), border = NA)
 
 # Add AUC value in the legend
 legend("bottomright", legend = paste("AUC =", round(auc_value, 2)), col = "blue", lty = 1)
-
 ```
+
+The AUC value quantifies the overall performance of the classifier, summarizing the ROC curve into a single number. It measures the likelihood that the model will rank a randomly chosen positive instance higher than a randomly chosen negative instance. An AUC of 0.85 indicates that the model is a good classifier, with an 85% probability of ranking a randomly chosen positive instance higher than a randomly chosen negative one. This value suggests that the model has a good overall performance, effectively balancing between true positives and false positives. While not perfect, it reflects a reliable model with a high degree of accuracy in distinguishing between the two classes.
 
 ## Conclusion
 
