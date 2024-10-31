@@ -220,6 +220,10 @@ eval_data$rm_squared <- eval_data$rm^2                    # Create rm_squared
 # Predictions on evaluation data using the best model (model3 in this case)
 eval_data$pred_prob <- predict(model3, newdata = eval_data, type = "response")
 eval_data$pred_class <- ifelse(eval_data$pred_prob > 0.5, 1, 0)
+
+# Display first few rows to confirm
+head(eval_data[, c("log_medv", "rm_squared", "pred_prob", "pred_class")])
+
 ```
 
 
