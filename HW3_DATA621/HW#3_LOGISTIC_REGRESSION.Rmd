@@ -176,13 +176,149 @@ model2 <- glm(target ~ log_medv + rm + rm_squared + lstat, data = train_data, fa
 summary(model2)
 ```
 
+Here are the interpretations of each of the predictors used in model 2:
+
+- log_medv: -1.20293 indicates that for every one-unit increase in the log of the median value of owner-occupied homes, the log-odds of high crime decreases. The p-value is 0.066306, which is marginally significant (p < 0.1), suggesting this predictor might still have some importance but is not conventionally significant at the 0.05 level.
+
+- rm: -9.29450 indicates that for each additional room in a dwelling, the log-odds of high crime decreases significantly (p < 0.001). This suggests a strong negative relationship between the average number of rooms and high crime levels.
+
+- rm_squared: 0.78630 indicates a positive association with the log-odds of high crime, suggesting that as the number of rooms increases, the effect of rooms on high crime becomes more positive at higher levels of rm (p < 0.001).
+
+- lstat: 0.19639 indicates that for each one-unit increase in the lower status of the population, the log-odds of high crime increase significantly (p < 0.001).
+
 #### a.3. Model 3: Stepwise Regression for Variable Selection
 
 ```{r}
 model3 <- stepAIC(glm(target ~ ., data = train_data, family = "binomial"), direction = "both")
 summary(model3)
 ```
+Model 3 reveals that the following predictors are statistically significant with p < 0.05;
+
+- zn (*)
+- nox (***)
+- rm (***)
+- age (**)
+- dis (**)
+- rad (***)
+- tax (***)
+- ptratio (**)
+- rm_squared (***)
+
+Now that we have three models, we can use their AIC values to compare them and conclude which model is better fit: the AIC value of 205.14 for model 3 shows a better fit than both Model 1 (AIC = 223.95) and Model 2 (AIC = 493.96). This suggests that Model 3 is a more efficient model in terms of balancing goodness of fit and complexity.
+
+## 4. SELECT MODELS 
+
+### a. Predictions on Evaluation Data
+
+Now that we decided which model is the best, we can predict on evaluation data :
+
+```{r}
+# Calculate log_medv and rm_squared in evaluation data
+eval_data$log_medv <- log(eval_data$medv)                # Create log_medv
+eval_data$rm_squared <- eval_data$rm^2                    # Create rm_squared
+
+# Predictions on evaluation data using the best model (model3 in this case)
+eval_data$pred_prob <- predict(model3, newdata = eval_data, type = "response")
+eval_data$pred_class <- ifelse(eval_data$pred_prob > 0.5, 1, 0)
+```
+
+
+### b. Confusion Matrix and Metrics
+
+```{r}
+length(eval_data$target)
+length(eval_data$pred_class)
+```
+
+```{r}
+# Inspect eval_data
+str(eval_data)
+summary(eval_data)
+
+# Check if target variable is present
+if ("target" %in% colnames(eval_data)) {
+    cat("Target variable exists in eval_data.\n")
+} else {
+    cat("Target variable is missing from eval_data.\n")
+}
+```
+
+```{r}
+# Summary of predicted probabilities
+summary(eval_data$pred_prob)
+
+# Summary of predicted classes
+table(eval_data$pred_class)
+```
 
 
 
+```{r}
+# Make predictions on training data
+train_data$pred_prob <- predict(model3, newdata = train_data, type = "response")
+train_data$pred_class <- ifelse(train_data$pred_prob > 0.5, 1, 0)
+
+# Confusion Matrix
+confusion_matrix <- table(train_data$target, train_data$pred_class)
+cat("Confusion Matrix:\n")
+print(confusion_matrix)  # Ensure the confusion matrix displays
+
+# Accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+cat("Accuracy:", accuracy, "\n")
+
+# Classification Error Rate
+classification_error_rate <- 1 - accuracy
+cat("Classification Error Rate:", classification_error_rate, "\n")
+
+# Sensitivity and Specificity
+sensitivity <- confusion_matrix[2, 2] / sum(confusion_matrix[2, ])
+specificity <- confusion_matrix[1, 1] / sum(confusion_matrix[1, ])
+cat("Sensitivity:", sensitivity, "\n")
+cat("Specificity:", specificity, "\n")
+
+# Precision
+precision <- confusion_matrix[2, 2] / sum(confusion_matrix[, 2])
+cat("Precision:", precision, "\n")
+
+# F1 Score
+f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity)
+cat("F1 Score:", f1_score, "\n")
+
+# ROC Curve and AUC
+library(pROC)
+roc_obj <- roc(train_data$target, train_data$pred_prob)
+auc_value <- auc(roc_obj)
+cat("AUC:", auc_value, "\n")
+
+# Plot ROC Curve
+plot(roc_obj, main = "ROC Curve", xlim = c(0, 1), ylim = c(0, 1),
+     xlab = "False Positive Rate", ylab = "True Positive Rate")
+abline(a = 0, b = 1, lty = 2, col = "red") # Add a diagonal line for reference
+```
+
+- Confusion Matrix:
+
+True Negatives (0 predicted as 0): 218
+
+False Positives (0 predicted as 1): 19
+
+False Negatives (1 predicted as 0): 20
+
+True Positives (1 predicted as 1): 209
+
+- Accuracy (91.63%): Indicates that the model correctly predicts the class for about 92% of the training samples, a strong result.
+
+- Classification Error Rate (8.37%): Complements the accuracy, showing the proportion of misclassifications, which is low.
+
+- Sensitivity (91.27%): Represents the model’s ability to correctly identify positive cases (target = 1). This high sensitivity means the model is effective in identifying positives.
+
+- Specificity (91.98%): Indicates the model’s ability to correctly identify negative cases (target = 0). A similarly high value here shows balanced performance across classes.
+
+- Precision (91.67%): Shows how many of the instances predicted as positive are actually positive, which is crucial if the cost of false positives is high.
+F1 Score (91.47%): Balances precision and sensitivity, confirming the model’s consistent performance.
+
+- AUC (0.9766): Reflects excellent overall separability between classes, meaning the model is likely distinguishing well between positive and negative cases.
+
+These metrics suggest a well-performing model, especially given the high AUC and balanced sensitivity and specificity.
 
