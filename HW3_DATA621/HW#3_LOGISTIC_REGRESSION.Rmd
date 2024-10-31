@@ -1,0 +1,188 @@
+---
+title: "HW#3:LOGISTIC_REGRESSION"
+author: "Saloua Daouki"
+date: "2024-10-31"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Our objective is to build a binary logistic regression model on the training data set to predict whether the neighborhood will be at risk for high crime levels. We will provide classifications and probabilities for the evaluation data set using our binary logistic regression model. We can only use the variables given to us (or, variables that we derive from the variables provided). Below is a short description of the variables of interest in the data set:
+
+• zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
+
+• indus: proportion of non-retail business acres per suburb (predictor variable)
+
+• chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
+
+• nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
+
+• rm: average number of rooms per dwelling (predictor variable)
+
+• age: proportion of owner-occupied units built prior to 1940 (predictor variable)
+
+• dis: weighted mean of distances to five Boston employment centers (predictor variable)
+
+• rad: index of accessibility to radial highways (predictor variable)
+
+• tax: full-value property-tax rate per $10,000 (predictor variable)
+
+• ptratio: pupil-teacher ratio by town (predictor variable)
+
+• lstat: lower status of the population (percent) (predictor variable)
+
+• medv: median value of owner-occupied homes in $1000s (predictor variable)
+
+• target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+
+## 1. DATA EXPLORATION
+
+### a. Load the Data and Check Size/Variables
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+
+# Load the datasets
+train_data <- read.csv("crime-training-data_modified.csv")  # Training data
+eval_data <- read.csv("crime-evaluation-data_modified.csv")  # Evaluation data
+
+# Check the dimensions and structure of the datasets
+dim(train_data)
+str(train_data)
+```
+
+### b. Calculate Mean, Standard Deviation, and Median
+
+```{r}
+# Summary statistics for training data
+summary_stats <- train_data %>% summarise(across(everything(), list(mean = ~mean(.x, na.rm = TRUE), 
+                                                                      sd = ~sd(.x, na.rm = TRUE), 
+                                                                      median = ~median(.x, na.rm = TRUE))))
+print(summary_stats)
+```
+
+### c. Bar Chart and Box Plot
+
+```{r}
+# Box plot for continuous variables vs. target
+ggplot(train_data, aes(x = factor(target), y = rm)) + 
+  geom_boxplot() + 
+  labs(title = "Box Plot of Rooms vs. Crime Rate", x = "High Crime Rate (1 = Yes, 0 = No)", y = "Average Rooms")
+
+# Bar chart for categorical variable (e.g., chas)
+ggplot(train_data, aes(x = factor(chas), fill = factor(target))) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar Chart of Charles River Bordering vs. Crime Rate", x = "Borders Charles River (1 = Yes, 0 = No)", fill = "High Crime Rate")
+```
+
+### d. Correlation Matrix
+
+```{r}
+# Correlation matrix for training data
+correlation_matrix <- cor(train_data %>% select(-target), use = "complete.obs")
+print(correlation_matrix)
+
+# Visualization of correlation matrix
+library(ggcorrplot)
+ggcorrplot(correlation_matrix, lab = TRUE)
+```
+### e. Calculating skewness and checking nonlinearity
+
+```{r}
+library(ggplot2)
+ggplot(train_data, aes(x = medv)) + geom_histogram(bins = 30) + ggtitle("Distribution of medv")
+
+# Calculate skewness
+library(moments)
+skewness_value <- skewness(train_data$medv)
+print(skewness_value)
+```
+The medv variable is positively skewed; we can see it from the histogram above where the right hand side tail is longer and also from the skewness value of 1.080167, this tells us that log transformation is suitable for the variable 'medv'.
+
+```{r}
+#checking nonlinearity between rm and target
+ggplot(train_data, aes(x = rm, y = target)) + geom_point() + geom_smooth(method = "loess")
+```
+
+Baed on the scatter plot above, the relationship between the rm and target is non-linear, we can use polynomial terms, perhaps square of rm.
+
+### f. Check for Missing Values
+
+```{r}
+# Check for missing values in training data
+missing_values <- sapply(train_data, function(x) sum(is.na(x)))
+print(missing_values)
+```
+
+## 2. DATA PREPARATION 
+
+Since there is no missing values in the provided data, we can skip handling them in this section.
+
+### a.  Mathematical Transformations
+
+```{r}
+# Log transformation of medv
+train_data <- train_data %>%
+  mutate(log_medv = log(medv + 1))  # Adding 1 to avoid log(0)
+
+# Adding a quadratic term for rm
+train_data <- train_data %>%
+  mutate(rm_squared = rm^2)
+```
+
+## 3. BUILD MODELS 
+
+### a. Build Logistic Regression Models
+
+#### a.1. Model 1: Using All Predictors
+
+```{r}
+model1 <- glm(target ~ zn + indus + chas + nox + rm + age + dis + rad + tax + ptratio + lstat, 
+              data = train_data, 
+              family = "binomial")
+summary(model1)
+```
+
+Here are the key coefficient of model 1
+
+- nox (Nitrogen oxides concentration): 44.02299 indicates that for each unit increase in nox, the log-odds of high crime increase significantly, which is very strong evidence (p < 0.001); highly significant.
+
+- rm (Average number of rooms): 1.001582 indicates that an increase of one room is associated with a significant increase in the likelihood of high crime (p < 0.05), statistically significant.
+
+- dis (Weighted mean distance to employment centers): 0.4922 indicates that as distance increases, the likelihood of high crime increases (p < 0.05), statistically significant.
+
+- rad (Accessibility to radial highways): 0.6359 shows that increased access is positively associated with high crime levels (p < 0.001); highly significant.
+
+- tax (Property-tax rate): -0.007331 suggests that higher property tax rates are associated with lower likelihood of high crime (p < 0.05), statistically significant.
+
+- ptratio (Pupil-teacher ratio): 0.2202 indicates a positive association with high crime rates (p < 0.05)statistically significant.
+
+- lstat (Lower status of the population): The coefficient is not statistically significant (p = 0.3679), suggesting it may not be a useful predictor in this model because it is not significant.
+
+#### a.2. Model 2: With Transformations and Selected Predictors
+
+```{r}
+model2 <- glm(target ~ log_medv + rm + rm_squared + lstat, data = train_data, family = "binomial")
+summary(model2)
+```
+
+#### a.3. Model 3: Stepwise Regression for Variable Selection
+
+```{r}
+model3 <- stepAIC(glm(target ~ ., data = train_data, family = "binomial"), direction = "both")
+summary(model3)
+```
+
+
+
+
