@@ -1,6 +1,6 @@
 ---
 title: "HW#3:LOGISTIC_REGRESSION"
-author: "Saloua Daouki"
+author: "Lewris Mota Sanchez, Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh"
 date: "2024-10-31"
 output:
   html_document:
