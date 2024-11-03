@@ -1,0 +1,438 @@
+---
+title: 'DATA 621HOMEWORK_3: LOGISTIC REGRESSION'
+author: "Warner Alexis"
+date: "2024-11-01"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Objective
+
+The objective is to build a **binary logistic regression model** on the training data set to predict whether
+the neighborhood will be at risk for high crime levels. 
+Below is a short description of
+the variables of interest in the data set:
+
+zn: proportion of residential land zoned for large lots (over 25000 square feet) (predictor variable)
+- indus: proportion of non-retail business acres per suburb (predictor variable)
+- chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0) (predictor variable)
+- nox: nitrogen oxides concentration (parts per 10 million) (predictor variable)
+- rm: average number of rooms per dwelling (predictor variable)
+- age: proportion of owner-occupied units built prior to 1940 (predictor variable)
+- dis: weighted mean of distances to five Boston employment centers (predictor variable)
+- rad: index of accessibility to radial highways (predictor variable)
+- tax: full-value property-tax rate per $10,000 (predictor variable)
+- ptratio: pupil-teacher ratio by town (predictor variable)
+- lstat: lower status of the population (percent) (predictor variable)
+- medv: median value of owner-occupied homes in $1000s (predictor variable)
+- target: whether the crime rate is above the median crime rate (1) or not (0) (response variable)
+
+
+
+## Data Exploration
+
+
+
+```{r, warning=FALSE}
+# Loading libraries 
+
+library(dplyr)
+library(caret)
+library(MASS)
+library(corrplot)
+library(gridExtra)
+library(ggplot2)
+library(kableExtra)
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+# Laod teh data 
+crime_data <- read.csv('crime-training-data_modified.csv')
+train_test <- read.csv('crime-evaluation-data_modified.csv')
+# Looking at the structure of the dataset 
+str(crime_data)
+ds_stats <- psych::describe(crime_data, skew = TRUE, na.rm = TRUE)
+#ds_stats
+kable(ds_stats[1:7], caption= "Data Summary")
+kable(ds_stats[8:13], caption= "Data Summary (Cont)")
+
+```
+
+
+
+
+
+```{r}
+# Plot the distribution 
+
+numeric_vars <- c("zn", "indus", "nox", "rm", "age", "dis", "tax", "ptratio", "lstat", "medv")
+par(mfrow=c(3,4))
+for (var in numeric_vars) {
+  hist(crime_data[[var]], main = paste('Histogram of', var), xlab= var, col= 'lightblue')
+}
+```
+
+
+
+The box plots show the distribution of various predictor variables for areas with low (0) and high (1) crime rates, offering insights into how each variable relates to crime. In areas with low crime rates, the zn variable (proportion of residential land) has a higher median and wider range, suggesting more residential zoning in lower-crime areas. In contrast, high-crime areas tend to have higher values of indus (non-retail business acreage), nox (nitrogen oxide concentration), age (older properties), rad (proximity to highways), and tax (property taxes). This indicates that industrial zones, pollution, older buildings, highway access, and higher taxes may correlate with higher crime. Additionally, rm (average rooms per dwelling) and medv (median property value) have higher medians in low-crime areas, suggesting that larger residences and higher property values are associated with lower crime rates. The dis variable (distance to employment centers) has a lower median for high-crime areas, implying that areas closer to job hubs may have more crime. Furthermore, the ptratio (pupil-teacher ratio) and lstat (percentage of lower socioeconomic status individuals) are slightly higher in high-crime areas, hinting at possible links between socioeconomic factors, educational resources, and crime. Overall, these plots reveal that lower crime areas tend to have more residential zoning, larger homes, and higher property values, while high-crime areas are associated with industrial zones, pollution, older properties, highway access, and socioeconomic challenges.
+
+
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+
+
+# Define a list of all predictor variables
+predictor_vars <- c("zn", "indus", "chas", "nox", "rm", "age", "dis", 
+                    "rad", "tax", "ptratio", "lstat", "medv")
+
+# Create a list to store each plot
+plots <- list()
+
+# Generate boxplots for each predictor variable against the target
+for (var in predictor_vars) {
+  p <- ggplot(crime_data, aes(x = as.factor(target), y = .data[[var]])) +
+    geom_boxplot() +
+    labs(x = "Crime Rate (0 = Low, 1 = High)", y = var) +
+    ggtitle(paste(var, "Distribution by Crime Rate"))
+  plots[[var]] <- p  # Add each plot to the list
+}
+
+# Arrange plots in a 3x4 grid
+grid.arrange(grobs = plots, ncol = 4, nrow = 3)
+```
+
+Strong positive correlations are observed between tax and rad (0.91), as well as between indus and nox (0.76). These suggest that areas with high tax rates tend to have better highway accessibility (rad), and industrial zones (indus) correlate with higher nitrogen oxide levels (nox).
+
+Negative correlations are seen between dis and variables like nox (-0.77) and rad (-0.71), indicating that neighborhoods farther from employment centers tend to have lower nitrogen oxide levels and less highway access.
+
+The correlations between each predictor variable and the target variable (whether the crime rate is above or below the median) reveal significant patterns in neighborhood characteristics associated with crime. A strong positive correlation with crime rate is seen for `nox` (nitrogen oxide concentration, 0.73), `indus` (proportion of industrial land, 0.60), `age` (proportion of older homes, 0.63), and `rad` (access to radial highways, 0.63). These values suggest that neighborhoods with higher pollution levels, more industrial areas, older housing stock, and better highway accessibility tend to have higher crime rates. 
+
+Conversely, there are negative correlations for variables such as `zn` (proportion of large residential lots, -0.43), `dis` (distance from employment centers, -0.62), and `medv` (median home value, -0.27). This implies that neighborhoods with larger residential lots, greater distances from employment centers, and higher home values generally experience lower crime rates. Moderate positive correlations are found for `tax` (property tax rate, 0.61) and `lstat` (lower-status population percentage, 0.47), indicating that areas with higher tax rates and a higher proportion of lower-status residents also tend to have increased crime rates. Other variables like `chas` (proximity to the Charles River, 0.08) and `rm` (average number of rooms per dwelling, -0.15) show weak correlations, suggesting a limited relationship with crime rate. These correlation values help identify influential features that may be predictive of crime levels in neighborhoods.
+
+
+```{r}
+# Correlation matrix and correlation with target
+corr_matrix <- cor(crime_data[, -which(names(crime_data) == "target")])
+corrplot(corr_matrix, method = "number")
+# Correlation of each variable with target variable
+cor_with_target <- sapply(crime_data[, -which(names(crime_data) == "target")], function(x) cor(x, crime_data$target))
+print(cor_with_target)
+
+```
+
+This set of binary plots illustrates the relationship between several predictor variables and the probability of high crime rates in neighborhoods. Each panel represents a different predictor variable and its influence on the likelihood of high crime, with a logistic curve (in red) showing the estimated probability. The variables `dis` (distance to employment centers) and `medv` (median home value) both show a negative relationship with crime probability, suggesting that neighborhoods further from employment centers and with higher home values are less likely to have high crime rates. Conversely, `rad` (access to radial highways), `tax` (property tax rate), `ptratio` (pupil-teacher ratio), and `lstat` (lower status of the population) are positively associated with crime probability. This implies that neighborhoods with better highway access, higher property taxes, lower socioeconomic status, and fewer educational resources are more prone to higher crime rates. Overall, these plots provide a visual summary of how each predictor variable impacts the likelihood of high crime rates, highlighting socioeconomic and accessibility factors as key contributors.
+
+
+
+```{r}
+library(popbio)
+# Relationship are not linear 
+x<-crime_data[,]
+
+par(mfrow=c(2,3))
+logi.hist.plot(x$zn,x$target,logi.mod = 1, type="p", boxp=FALSE,col="gray", mainlabel = "zn")
+logi.hist.plot(x$indus, x$target,logi.mod = 1, type="hist",boxp=FALSE,col="gray", mainlabel = "indus")
+logi.hist.plot(x$chas,x$target,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "chas")
+logi.hist.plot(x$nox, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "nox")
+logi.hist.plot(x$rm,x$target,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "rm")
+logi.hist.plot(x$age, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "age")
+logi.hist.plot(x$dis,x$target,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "dis")
+logi.hist.plot(x$rad, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "rad")
+logi.hist.plot(x$tax,x$target,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "tax")
+logi.hist.plot(x$ptratio, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "ptratio")
+#logi.hist.plot(x$black,x$target,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "black")
+logi.hist.plot(x$lstat, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "lstat")
+logi.hist.plot(x$medv, x$target,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "medv")
+
+# remove Outliers 
+treat_outliers <- function(x) {
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+  caps <- quantile(x, probs=c(.05, .95), na.rm = T)
+  H <- 1.5 * IQR(x, na.rm = T)
+  x[x < (qnt[1] - H)] <- caps[1]
+  x[x > (qnt[2] + H)] <- caps[2]
+  
+  return(x)
+}
+
+crime_data_train<-crime_data
+train_test <- read.csv('crime-evaluation-data_modified.csv') # load evaulation/test set 
+train_test_mod<-train_test # chamging name to test set 
+
+crime_data_train$tax_new <- treat_outliers(crime_data$tax) # remove outliers for tax
+crime_data_train$medv_new <- treat_outliers(crime_data$medv) # remove outliers for medv
+crime_data_train$lstat_new <- treat_outliers(crime_data$lstat)#  # remove outliers for lsatt
+
+# do the same for test set 
+train_test_mod$tax_new <- treat_outliers(train_test$tax) # remove outliers for tax
+train_test_mod$medv_new <- treat_outliers(train_test$medv)# remove outliers for medv
+train_test_mod$lstat_new <- treat_outliers(train_test$lstat)  # remove outliers for lsatt
+
+# plot the newly made variables with no outliers 
+par(mfrow=c(1,3))
+# Box plot to distributetions and mean values 
+boxplot(crime_data_train$tax_new,main="tax_new") 
+boxplot(crime_data_train$medv_new,main="medv_new")
+boxplot(crime_data_train$lstat_new,main="lstat_new")
+
+
+
+
+```
+
+
+
+
+These plots show a series of data transformations applied to an original variable (shown in the top left histogram) to explore its effect on the distribution. Each transformation can impact the spread and symmetry of the data, potentially helping to improve model performance or meet assumptions of normality.
+
+1. **Original Data (Top Left)**: Shows the frequency distribution of the raw data, which appears skewed to the right.
+
+2. **Log Transform**: Compresses the data range, especially for larger values, helping to reduce skewness. This can be useful when data spans multiple orders of magnitude.
+
+3. **Square Root Transform**: Similar to the log transform, but less aggressive. It can moderate right-skewed data while preserving data order.
+
+4. **Sine Transform**: Applies the sine function to the data. This is less common for normalization, but may be useful for cyclic or periodic data.
+
+5. **Ninth Root Transform**: A specific type of root transformation that reduces the influence of large values, though less drastically than the square root. 
+
+Each transformation changes the data distribution, which can help in reducing skewness, stabilizing variance, or meeting other modeling requirements.
+
+
+```{r}
+#Checking how different transformation works on this Data set
+
+crime_data_train$rm_new<-sin(crime_data$rm)
+
+crime_data_train$dis_new<-sin(crime_data$dis)
+
+train_test_mod$rm_new<-sin(train_test$rm)
+
+train_test_mod$dis_new<-sin(train_test$dis)
+
+
+par(mfrow=c(1,2))
+
+#boxplot(city_crime_train_mod$rm_new,main="rm_new")
+#boxplot(city_crime_train_mod$dis_new,main="dis_new")
+show_charts <- function(x, ...) {
+  
+  par(mfrow=c(2,3))
+  
+  xlabel <- unlist(str_split(deparse(substitute(x)), pattern = "\\$"))[2]
+  ylabel <- unlist(str_split(deparse(substitute(y)), pattern = "\\$"))[2]
+  
+  hist(x,main=xlabel)
+  boxplot(x,main=xlabel)
+  
+  y<-log(x)
+  boxplot(y,main='log transform')
+  y<-sqrt(x)
+  boxplot(y,main='sqrt transform')
+  y<-sin(x)
+  boxplot(y,main='sin transform')
+  y<-(x)^(1/9)
+  boxplot(y,main='ninth transform')
+  
+}
+
+library(stringr)
+
+attach(crime_data_train)
+
+show_charts(zn)
+
+
+show_charts(indus)
+
+
+show_charts(nox)
+
+
+show_charts(rm)
+
+
+
+show_charts(age)
+
+show_charts(dis)
+
+
+show_charts(rad)
+
+
+
+show_charts(tax)
+
+
+
+show_charts(ptratio)
+
+
+
+show_charts(lstat)
+
+
+show_charts(medv)
+
+
+
+```
+
+
+
+
+We create **Ratio and Interations** combining  variables such as tax with ptratio (as a measure of affordability) or rm and age (to capture older, larger homes) can create meaningful new variables. These interaction terms can capture unique relationships between predictors and crime rate. We normalize variables with skewed distributions. The log or square root transformations can help normalize the data, making it more suitable for logistic regression 
+
+```{r}
+crime_data <- crime_data_train
+# Creating Categories 
+crime_data$lstat_log <- log(crime_data$lstat +1)
+crime_data$tax_log <- log(crime_data$tax + 1)
+
+train_test$lstat_log <- log(train_test$lstat +1)
+train_test$tax_log <- log(train_test$tax + 1)
+# Creating new ratio variables
+crime_data$tax_ptratio_ratio <- crime_data$tax / crime_data$ptratio
+crime_data$rm_age_interaction <- crime_data$rm * crime_data$age
+
+train_test$tax_ptratio_ratio <- train_test$tax / train_test$ptratio
+train_test$rm_age_interaction <- train_test$rm * train_test$age
+
+
+
+# Bucketing age into categories
+crime_data$age_group <- cut(crime_data$age, breaks = c(0, 35, 70, 100), labels = c("Low", "Medium", "High"))
+train_test$age_group <- cut(train_test$age, breaks = c(0, 35, 70, 100), labels = c("Low", "Medium", "High"))
+# Bucketing dis into categories
+crime_data$dis_group <- cut(crime_data$dis, breaks = quantile(crime_data$dis, probs = seq(0, 1, 0.33)), include.lowest = TRUE)
+train_test$dis_group <- cut(train_test$dis, breaks = quantile(train_test$dis, probs = seq(0, 1, 0.33)), include.lowest = TRUE)
+## Standardizing selected variables
+crime_data <- crime_data %>%
+  mutate(across(c(zn, indus, nox, rm, age, dis, rad, tax, ptratio, lstat, medv), scale))
+
+train_test <- train_test %>%
+  mutate(across(c(zn, indus, nox, rm, age, dis, rad, tax, ptratio, lstat, medv), scale))
+
+head(crime_data)
+head(train_test)
+
+```
+
+
+
+
+## Model Development
+
+**MODEL 1**
+
+
+The Analysis of Deviance table provides insights into the contribution of each predictor variable to the logistic regression model predicting crime rates. The results show that `indus` (proportion of industrial land) and `nox` (nitrogen oxide concentration) significantly reduce the deviance, with highly significant p-values (< 2.2e-16), indicating that these are strong predictors of crime rate. Adding `rad` (access to radial highways) also significantly improves the model, reducing deviance by 58.076 with a p-value of 2.522e-14, suggesting that highway accessibility is relevant in predicting higher crime rates. Similarly, `tax` (property tax rate) further improves the model with a deviance reduction of 10.184 and a significant p-value of 0.001416, indicating a meaningful association with crime. In contrast, variables like `age` (proportion of older homes) and `dis` (distance to employment centers) show high p-values and minimal reductions in deviance, implying that they do not add significant explanatory power to the model once other variables are included. Overall, the results suggest that crime rates are closely associated with industrial land, pollution levels, highway access, and property tax rates, while factors such as housing age and proximity to employment centers contribute less to the model.
+
+
+
+```{r}
+set.seed(123)
+# Model Development
+m1 <- glm(target ~ indus + nox + age + dis + age + rad + tax, data = crime_data, family = 'binomial')
+# Summary of the model 
+summary(m1)
+# Deviance analyis 
+anova(m1, test = 'Chi') # use to ananlyse deviance in all variables 
+
+# Odd Ratio 
+s <- c("indus" , "nox" , "age" , "dis" , "age" , "rad" , "tax")
+or_m1 <- exp(coef(m1)[s])
+print(or_m1)
+
+
+step_m1 <- step(m1, direction = 'backward')
+summary(step_m1)
+
+
+exp(coef(m1)[s])/(1 + exp(coef(m1)[s]))
+
+
+```
+
+
+
+R performs a hypothesis test for each coefficient, that is, $H_O:  β_j=0$ versus $β_j\neq 0 for j=0,1 $ via the Wald test, and print the $p-values$ in the last column. We can thus compare these $p-values$ to the chosen significance level (usually $\alpha = 0.05$) to conclude whether or not each of the coefficient is significantly different from 0. 
+
+- When $\beta_1 = 0,$ X and Y are independent
+
+- When $\beta_1 > 0 $, The probability That Y = 1 increase with X, and 
+
+- When $\beta_1 < 0 $,the probability that Y = 1 decreases with X
+
+
+Which means in our context: 
+- When $\beta_1 = 0,$ the probability of having crime is independent of the predictors we are comparing, 
+
+- When $\beta_1 > 0 $, the probability of having crime increases with the the predictors, and 
+
+- When $\beta_1 < 0 $,the probability of having crime decreases with the the predictors.
+
+The result shows the probability of a higher crime rate (target = 1) when each predictor variable (indus, nox, age, dis, age, rad, and tax) is evaluated individually with all other predictors set to zero in the logistic regression model.
+
+The probabilities indicate how each predictor alone influences the likelihood of a high crime rate. `nox` (99.1%) and `rad` (99.5%) show strong positive associations with crime, suggesting pollution and highway access are linked to higher crime rates. `age` (65.1%) and `dis` (62.5%) have moderate associations, indicating older properties and proximity to job centers also relate to crime. `indus` (41.2%) shows a weaker, moderate association, while `tax` (21.4%) is inversely related to crime, suggesting that higher-taxed areas tend to have lower crime rates.
+
+
+This logistic regression model examines the relationship between crime rate and predictors such as nox (pollution), age (property age), dis (distance to employment centers), rad (highway access), and tax (property tax) in crime_data. Significant predictors (p < 0.05) include nox, age, rad, and tax. Higher nox and rad values are associated with an increased likelihood of higher crime rates, while higher tax reduces this likelihood. The age of properties also slightly increases the likelihood of higher crime. The non-significant dis variable suggests that proximity to job centers is not strongly linked to crime rates in this model. The model reduces deviance from 645.88 to 218.17, indicating that these predictors explain a substantial portion of the variation in crime rates. An AIC of 230.17 suggests a reasonable fit.
+
+**MODEL 2**
+
+
+```{r}
+# Model 2 
+
+crime_data_train_scaled <- crime_data[,1:22]
+s <- crime_data[,1:22] %>%
+  mutate(across(where(is.numeric) & !c(target, chas), scale))
+m2 <- glm(target ~ indus + tax_new + medv_new + dis_new + tax_log , family =  'binomial', data = s)
+summary(m2)
+
+# Odd Ratio 
+s2 <- c("indus" , "tax_new" , "medv_new" , "dis_new " , "tax_log" )
+or_m2 <- exp(coef(m2)[s2])
+print(or_m2)
+
+
+step_m2 <- step(m2, direction = 'backward')
+summary(step_m2)
+
+
+exp(coef(m2)[s2])/(1 + exp(coef(m2)[s2]))
+
+
+```
+
+
+
+
+The logistic regression model summary shows the estimated coefficients and significance levels for the predictors `indus`, `medv_new`, and `tax_log`, along with the intercept. The coefficient for `indus` is 0.9864 (p < 0.001), indicating a strong, positive association with the likelihood of high crime levels. Similarly, `tax_log` has a high positive coefficient of 1.2529 (p < 0.001), showing a significant influence on increasing crime probability. The variable `medv_new` has a smaller positive effect (0.3654, p < 0.05), indicating a weaker but still statistically significant association. The model’s AIC is 414.7, suggesting a balance between goodness of fit and model complexity. Overall, the model significantly reduces deviance from the null (645.88) to residual (406.70), indicating a better fit with these predictors.
+
+
+**Model 3**
+
+
+The stepwise selection process using AIC (Akaike Information Criterion) has iteratively removed and added predictors to find the most parsimonious model for predicting the target variable. Starting from an initial model with multiple predictors, the stepwise selection method aimed to minimize the AIC, a measure balancing model fit and complexity. At each step, variables were assessed for their contribution to the model, with the least significant predictors being removed. The process stopped at an AIC of 157.95, suggesting this model best balances fit and simplicity. Key variables that remain in the model include `indus`, `nox`, `rad`, `tax`, `ptratio`, `lstat`, `medv`, `rm_new`, `dis_new`, `lstat_log`, `tax_log`, `tax_ptratio_ratio`, and `rm_age_interaction`. These variables were retained as they contribute meaningful information for predicting the target. Additionally, no further improvements in AIC were possible by adding or removing individual variables, suggesting that this model is near optimal in terms of predictive power relative to complexity.
+
+```{r}
+m3 <- stepAIC(glm(target ~ ., data = s, family = "binomial"), direction = "both")
+summary(m3)
+```
+
+
