@@ -1,0 +1,839 @@
+---
+title: "Project 3: High Crime Rate Risk"
+author: "Lewris Mota Sanchez, Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh"
+date: "2024-10-10"
+output:
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+    always_allow_html: true
+  word_document:
+    toc: true
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+
+library(gridExtra)
+library(ggplot2)
+library(cowplot)
+options(scipen=10000)
+library(mlbench)
+library(tidyverse)
+library(corrplot)
+library(AppliedPredictiveModeling)
+library(caret)
+library(DataExplorer)
+library(kableExtra)
+library(mice)
+library(randomForest)
+library(pROC)
+library(skimr)
+library(DescTools)
+
+bins_cal <- function(data){
+  num_bins <- nclass.FD(data)
+bin_width <- (max(data) - min(data)) / num_bins
+return(bin_width)
+}
+
+```
+
+```{r}
+crime <- read.csv("crime-training-data_modified.csv")
+crime_test <- read.csv("crime-evaluation-data_modified.csv")
+```
+
+### Introduction
+
+This dataset provides a range of predictor variables capturing socioeconomic, environmental, and zoning characteristics relevant to understanding neighborhood crime risk. The target variable, indicating whether crime rates are above the median, is balanced across high and low crime areas, supporting robust classification.
+
+Key predictors include zoning (zn), which shows the proportion of large residential lots, and indus, reflecting non-retail business areas that may indicate economic activity. Environmental quality is captured by nox, the nitrogen oxides concentration, potentially associated with urban density, while chas is a binary variable indicating proximity to the Charles River, though it is highly imbalanced, with 95% of values in one class.
+
+Socioeconomic indicators like rm (average rooms per dwelling), lstat (lower-status population percentage), and medv (median home value) give insights into neighborhood affluence. Accessibility factors, such as dis (distance to employment centers) and rad (accessibility to highways), provide context on mobility, while tax and ptratio reflect local tax rates and educational resources. Together, these predictors offer a comprehensive basis for assessing the factors influencing neighborhood crime risk.
+
+### 1. Data Exploration
+
+In this section, we explore key patterns and characteristics in each variable to better understand their potential influence on neighborhood crime rates. Starting with the target variable, which indicates whether a neighborhood's crime rate is above the median, we confirm a balanced distribution across high and low crime areas, supporting a fair comparison across classes.
+
+***Training Data***
+
+```{r}
+crime |> head(n = 10) |> kable() |> kable_styling() |>  kable_classic() 
+```
+
+***Test Data***
+
+```{r}
+crime_test |> head(n=10) |> kable() |> kable_styling() |>  kable_classic() 
+```
+
+***Data Overview***
+
+```{r}
+skim(crime) |> kable() |> kable_styling() |>  kable_classic() 
+
+```
+
+From the initial statistics we can learn the following:
+
+1.  ***Land Use and Zoning:*** zn (residential land zoning) and indus (non-retail business area) both show variability, with zn heavily skewed toward low values, indicating most neighborhoods have minimal large-lot zoning.
+
+2.  ***Environmental Factors:*** nox (nitrogen oxides) displays a slight right skew, with most neighborhoods having moderate pollution levels. chas, a binary variable for proximity to the Charles River, is heavily imbalanced, with only 7% of neighborhoods bordering the river.
+
+3.  ***Housing Characteristics:*** rm (average rooms per dwelling) appears normally distributed, centered around 6 rooms, while age (older housing proportion) is skewed, indicating many neighborhoods have a high proportion of older homes.
+
+4.  ***Accessibility and Economic Factors:*** dis (distance to employment centers) and rad (highway access) show considerable spread, reflecting varying levels of accessibility across neighborhoods. tax (property tax rate) is right-skewed, with a concentration at high values, and ptratio (pupil-teacher ratio) is fairly balanced but leans toward higher values, suggesting moderate class sizes.
+
+5.  ***Socioeconomic Indicators:*** lstat (lower-status population percentage) and medv (median home value) exhibit right-skewed distributions, with higher values concentrated for lstat and some clustering at the upper range for medv.
+
+6.  ***Target Variable:*** target (above-median crime rate) is evenly distributed, supporting balanced classification between high- and low-crime neighborhoods.
+
+```{r}
+missing1 <- plot_intro(crime, title = 'Missing Information on the Crime Rate Dataset',
+           ggtheme = theme_minimal())
+# Plot missing volume in Column 
+missing2 <- plot_missing(crime,title = 'Information about Missing Values in the Crime Rate Dataset',ggtheme = theme_minimal())
+
+grid.arrange(missing1, missing2, nrow = 2,layout_matrix= rbind(1,2))
+```
+
+Also, the dataset used in this analysis is complete, with no missing values across any of the variables. This absence of missing data allows for straightforward analysis without the need for imputation or exclusion of records, ensuring that all available information can be utilized. We can proceed confidently with data exploration and modeling steps, knowing that the results will be based on complete data and free from potential biases that can arise from handling missing values.
+
+***Data Plots***
+
+To gain deeper insights into the dataset, we’ll beginby visualizing the data to uncover patterns, outliers, and relationships among variables. Using histograms, box plots, and scatter plots, we’ll examine distributions and correlations, gaining insights to guide data preprocessing and feature selection.
+
+```{r message=FALSE, warning=FALSE}
+level_columns <- c("chas","target")
+crime |> select(-all_of(level_columns)) |>
+  keep(is.numeric) |>
+  gather() |>
+  ggplot(aes(value)) + 
+  geom_histogram(binwidth = bins_cal) + 
+  facet_wrap(~key, scales = 'free', ncol = 4) +
+  ggtitle("Histograms of Numerical Predictors")
+
+
+crime |> select(level_columns) |>  gather() |>
+  ggplot() +
+  geom_bar(aes(x = value)) + 
+  facet_wrap(~key, scales = 'free', ncol = 2)+
+  ggtitle("Distribution of classes")
+```
+
+The chas variable, indicating whether a suburb borders the Charles River, has 95% of values in a single class, suggesting it contributes minimal variation and predictive value for identifying high-crime neighborhoods. Such a skewed distribution limits the model’s ability to leverage chas as a meaningful predictor, as there’s little differentiation among neighborhoods regarding this feature. Including it could therefore act as noise, adding complexity without improving predictive accuracy. Moreover, in a binary classification model, this imbalance may lead the model to overemphasize the few cases that do border the river, potentially biasing the results.
+
+The target variable, indicating whether a neighborhood’s crime rate is above the median, shows a balanced distribution across classes, with roughly equal representation of high and low crime areas. This even class distribution is beneficial for the model, as it allows for more robust learning and accurate classification of both high-risk and low-risk neighborhoods. With an even split, the model is less likely to develop bias toward one class, supporting stable and generalizable predictions that can accurately differentiate between high and low crime areas based on the predictors. This balanced target variable ensures that the model's outcomes reflect meaningful patterns in the data rather than skewed class representation, ultimately enhancing the model's reliability in identifying crime risk across neighborhoods.
+
+```{r}
+
+crime |> select(-all_of(c("chas","target"))) |>
+  keep(is.numeric) |>
+  gather() |>
+  ggplot(aes(value)) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,outlier.size=4) + 
+  facet_wrap(~key, scales = 'free',  ncol = 4) +
+  ggtitle("Boxplots of Numerical Predictors")
+```
+
+In the initial exploration of our dataset, we identified several variables with significant outliers, specifically in rm (average number of rooms per dwelling), medv (median value of owner-occupied homes), zn (proportion of residential land zoned for large lots), dis (weighted mean of distances to employment centers), and lstat (percentage of lower-status population). Outliers can have a substantial impact on our model, potentially skewing predictions and leading to biased parameter estimates. Therefore, it is essential to address these outliers effectively to ensure model stability and interpretability.
+
+Therefore, before computing correlations between variables, it is essential to address any identified outliers. Outliers can exert a disproportionate influence on correlation values, potentially overstating or understating relationships between variables. By managing these extreme values before calculating correlations, we ensure that the results better reflect true associations rather than the effects of anomalous data points.
+
+### 2. Data Preparation {.tabset}
+
+To support the development of three distinct models, we prepared three separate training datasets, each utilizing a unique transformation technique. The first dataset applies the SpatialSign transformation, the second employs the Yeo-Johnson transformation, and the third combines Log transformation with Winsorization.
+
+```{r}
+
+crime$target <- as.factor(crime$target)
+
+
+transformData <- function(data ,fields,methods){
+  
+  transformation_model <- data |> select(all_of(fields)) |> preProcess(method = methods)
+  trasnformed <- predict(transformation_model,data)
+  
+  return(list(trasnformed,transformation_model))
+}
+
+
+
+
+
+
+```
+
+#### SpatialSign Transformation
+
+In the first training set, the spatialSign transformation is applied to variables with notable outliers: rm (average number of rooms per dwelling), medv (median home value), zn (proportion of large-lot residential land), dis (mean distance to employment centers), and lstat (percent of lower-status population). The spatialSign transformation standardizes each observation to a unit length, focusing on the directional relationship between data points rather than their absolute magnitude. By projecting values onto a unit circle, this method minimizes the impact of extreme outliers, ensuring they do not disproportionately influence the relationships between variables. This transformation is particularly useful here because it allows the model to learn patterns based on data structure rather than being skewed by high-magnitude values. To maintain consistency, I also applied the spatialSign transformation to the test set (crime_test_transformed) using the same parameters from the training set, aligning both datasets and enhancing model robustness.
+
+***Transformed Data Overview***
+
+```{r}
+
+transform_1 <- transformData(crime,c("rm","medv","zn","dis","lstat","medv"),c("center", "scale", "spatialSign"))
+crime_trasnformed <- transform_1[[1]]
+transform_1_lambda <- transform_1[[2]]
+# transform_1_lambda
+crime_test_transformed <- predict(transform_1_lambda, crime_test)
+
+# crime_trasnformed  |> head(n=50) |> kable() |> kable_styling() |>  kable_classic() 
+```
+
+```{r}
+crime_trasnformed |> select(-all_of(c("chas","target"))) |>
+  keep(is.numeric) |>
+  gather() |>
+  ggplot(aes(value)) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,outlier.size=4) + 
+  facet_wrap(~key, scales = 'free',  ncol = 4) +
+  ggtitle("Boxplots of Numerical Predictors")
+```
+
+***Autocorrelations***
+
+```{r}
+crime_corr <- crime_trasnformed |> select(-all_of(c("chas","target")))
+
+correlations <- cor(crime_corr)
+
+corrplot(correlations, order = "hclust")
+
+```
+
+The autocorrelation matrix reveals several strong relationships among predictor variables, indicating potential multicollinearity concerns. Key correlations include a high positive relationship between indus (non-retail land) and nox (pollution) at 0.76, as well as between tax (property tax rate) and rad (accessibility to highways) at 0.91. These correlations suggest that industrial activity and pollution are linked, as are urban infrastructure and higher taxes.
+
+Negative correlations include dis (distance to employment centers) with nox (-0.73), showing that neighborhoods farther from industrial areas tend to have lower pollution levels. Another strong negative correlation is between lstat (lower-status population) and medv (median home value) at -0.64, suggesting that lower socioeconomic areas have lower property values.
+
+```{r}
+# correlations
+highCorr <- findCorrelation(correlations, cutoff = .75)
+correlated_cols <- crime_corr |> select(all_of(highCorr)) |> names()
+uncorr_columns <- crime_corr |> select(-all_of(highCorr)) |> names()
+
+```
+
+To address multicollinearity, we identified highly correlated columns to exclude from the final model. These columns have correlations above the chosen threshold (0.75) and are listed below:
+
+```{r}
+correlated_cols
+```
+
+The columns selected for model building exclude the highly correlated variables. The final set of uncorrelated columns are as follows:
+
+```{r}
+uncorr_columns
+```
+
+Finally, with the uncorrelated columns selected, we now build the final training and test datasets for model development:
+
+```{r}
+crime_training_m1 <- crime_trasnformed |> select(all_of(uncorr_columns))
+crime_training_m1$target <- crime_trasnformed$target
+crime_test_clean <- crime_test_transformed |> select(all_of(uncorr_columns))
+
+```
+
+#### Yeo-Johnson Transformation
+
+In the second training set, the Yeo-Johnson transformation is applied on the variables rm, medv, zn, dis, and lstat, focusing on reducing skewness and normalizing distributions. The Yeo-Johnson transformation is a flexible technique that accommodates both positive and zero values, making it suitable for variables with a wider range or those that include zeros. This method adjusts the shape of skewed distributions, stabilizing variance and bringing variables closer to normality, which can enhance the model's interpretive power and accuracy. For instance, medv and zn often exhibit right-skewed distributions, so the Yeo-Johnson transformation effectively compresses their higher values while preserving the relative order among observations. This preprocessing step was also applied to the test set (crime_test_transformed2), ensuring that both sets have consistent transformations and reducing the likelihood of overfitting due to distributional differences between training and test data.
+
+```{r}
+transform_2 <- transformData(crime,c("rm","medv","zn","dis","lstat","medv"),c("YeoJohnson"))
+crime_trasnformed2 <- transform_2[[1]]
+transform_2_lambda <- transform_2[[2]]
+crime_test_transformed2 <- predict(transform_2_lambda, crime_test)
+
+```
+
+```{r}
+crime_trasnformed2 |> select(-all_of(c("chas","target"))) |>
+  keep(is.numeric) |>
+  gather() |>
+  ggplot(aes(value)) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,outlier.size=4) + 
+  facet_wrap(~key, scales = 'free',  ncol = 4) +
+  ggtitle("Boxplots of Numerical Predictors")
+```
+
+***Autocorrelations***
+
+```{r}
+crime_corr2 <- crime_trasnformed2 |> select(-all_of(c("chas","target")))
+
+correlations2 <- cor(crime_corr2)
+
+corrplot(correlations2, order = "hclust")
+
+```
+
+In exploring the correlations among our predictor variables, we identified several strong relationships that could impact model stability and interpretation if left unaddressed. Notable high positive correlations include indus (proportion of non-retail business land) and nox (pollution) at 0.76, as well as tax (property tax rate) and rad (highway accessibility) at 0.91. These associations indicate overlapping information related to urban density and industrial activity, which could introduce multicollinearity in the model.
+
+Additionally, strong negative correlations were found between dis (distance to employment centers) and nox (-0.84), showing that areas farther from industrial centers generally have lower pollution levels. Similarly, lstat (lower-status population) and medv (median home value) exhibit a correlation of -0.83, underscoring a typical inverse relationship between socioeconomic status and property values.
+
+```{r}
+# correlations
+highCorr2 <- findCorrelation(correlations2, cutoff = .75)
+correlated_cols2 <- crime_corr2 |> select(all_of(highCorr2)) |> names()
+uncorr_columns2 <- crime_corr2 |> select(-all_of(highCorr2)) |> names()
+
+```
+
+To address multicollinearity, we identified highly correlated columns to exclude from the final model. These columns have correlations above the chosen threshold (0.75) and are listed below:
+
+```{r}
+correlated_cols2
+```
+
+The columns selected for model building exclude the highly correlated variables. The final set of uncorrelated columns are as follows:
+
+```{r}
+uncorr_columns2
+```
+
+Finally, with the uncorrelated columns selected, we now build the final training and test datasets for model development:
+
+```{r}
+crime_training_m2 <- crime_trasnformed2 |> select(all_of(uncorr_columns2))
+crime_training_m2$target <- crime_trasnformed2$target
+crime_test_clean2 <- crime_test_transformed2 |> select(all_of(uncorr_columns2))
+
+```
+
+#### Log and Winsorization Transformations
+
+For the third training set, log transformations with Winsorization is implemented to handle skewness and outliers across several variables. Specifically, log transformations were applied to zn and medv to address their heavy right-skew, compressing the upper tails and making their distributions more symmetric. This transformation stabilizes variance, making it easier for the model to capture patterns without being overly influenced by high-end values. Additionally, for variables with extreme outliers, such as lstat, rm, and dis. Winsorization, a method that caps values beyond a certain threshold (typically the 1st and 99th percentiles). This technique preserves all data points while reducing the influence of outliers, creating a controlled range without omitting any observations. By consistently applying these transformations to both training (crime_transformed3) and test (crime_test_transformed3) sets, we maintained a standardized approach to outlier management, ensuring that the model receives well-conditioned data free from extreme distortions.
+
+```{r}
+crime_trasnformed3 <- crime
+
+crime_test_transformed3 <- crime_test
+
+
+crime_trasnformed3$lstat <- Winsorize(crime$lstat)
+crime_trasnformed3$zn <-   Winsorize(log(1+crime$zn))
+crime_trasnformed3$rm <- Winsorize(crime$rm)
+crime_trasnformed3$medv <- Winsorize(log(1+crime$medv))
+crime_trasnformed3$dis <- Winsorize(crime$dis)
+
+crime_test_transformed3$lstat <- Winsorize(crime_test$lstat)
+crime_test_transformed3$zn <-   Winsorize(log(1+crime_test$zn))
+crime_test_transformed3$rm <- Winsorize(crime_test$rm)
+crime_test_transformed3$medv <- Winsorize(log(1+crime_test$medv))
+crime_test_transformed3$dis <- Winsorize(crime_test$dis)
+
+# transform_3 <- transformData(crime_trasnformed3,c("rm","medv","zn","dis","lstat","medv"),c("BoxCox"))
+# crime_trasnformed3 <- transform_3[[1]]
+# transform_3_lambda <- transform_3[[2]]
+# crime_test_transformed3 <- predict(transform_3_lambda, crime_test)
+
+```
+
+```{r}
+crime_trasnformed3 |> select(-all_of(c("chas","target"))) |>
+  keep(is.numeric) |>
+  gather() |>
+  ggplot(aes(value)) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,outlier.size=4) + 
+  facet_wrap(~key, scales = 'free',  ncol = 4) +
+  ggtitle("Boxplots of Numerical Predictors")
+```
+
+***Autocorrelations***
+
+```{r}
+crime_corr3 <- crime_trasnformed3 |> select(-all_of(c("chas","target")))
+
+correlations3 <- cor(crime_corr3)
+
+corrplot(correlations3, order = "hclust")
+
+```
+
+This analysis of correlations among predictors highlights strong relationships that may affect model stability due to multicollinearity. Key positive correlations include a notable association between indus (non-retail land proportion) and nox (pollution) at 0.76, as well as between tax (property tax rate) and rad (highway accessibility) at 0.91. These correlations indicate shared information about urban and industrial density, suggesting that both nox and tax may reflect aspects of heavily built-up areas.
+
+Significant negative correlations include dis (distance to employment centers) and nox (-0.79), suggesting that areas further from industrial hubs generally have lower pollution levels. The relationship between lstat (lower-status population percentage) and medv (median home value) also stands out with a correlation of -0.82, which aligns with the expected trend where lower socioeconomic status corresponds to lower property values.
+
+```{r}
+# correlations
+highCorr3 <- findCorrelation(correlations3, cutoff = .75)
+correlated_cols3 <- crime_corr3 |> select(all_of(highCorr3)) |> names()
+uncorr_columns3 <- crime_corr3 |> select(-all_of(highCorr3)) |> names()
+
+```
+
+To address multicollinearity, we identified highly correlated columns to exclude from the final model. These columns have correlations above the chosen threshold (0.75) and are listed below:
+
+```{r}
+correlated_cols3
+```
+
+The columns selected for model building exclude the highly correlated variables. The final set of uncorrelated columns are as follows:
+
+```{r}
+uncorr_columns3
+```
+
+Finally, with the uncorrelated columns selected, we now build the final training and test datasets for model development:
+
+```{r}
+crime_training_m3 <- crime_trasnformed3 |> select(all_of(uncorr_columns3))
+crime_training_m3$target <- crime_trasnformed3$target
+crime_test_clean3 <- crime_test_transformed3 |> select(all_of(uncorr_columns3))
+
+```
+
+### 3. Build Models {.tabset}
+
+This section details our approach to identifying the optimal subset of predictors for binary logistic regression models using Recursive Feature Elimination (RFE) with cross-validation. RFE is a powerful technique for selecting the most informative predictors, enhancing model performance by iteratively eliminating features that contribute less to predictive accuracy. Importantly, this process does not alter the transformed data itself; it simply evaluates and ranks features based on their contribution, helping to identify the best subset of predictors without modifying the underlying values.
+
+To ensure a robust selection, we configured RFE with 5-fold cross-validation, repeated 10 times for thorough evaluation. By using rfFuncs (Random Forest functions) within RFE, we leveraged Random Forest’s feature importance scores, which reliably rank variables according to their predictive strength. This approach allows us to retain the most impactful predictors without changing the original transformed data, making RFE ideal for datasets that have already undergone specific transformations or preprocessing steps.
+
+To explore a variety of variable combinations, RFE tested multiple subset sizes to find an optimal balance between model complexity and predictive performance. This flexibility provided insights into how different variable groupings affected model accuracy, without altering the transformed data structure. The RFE results were then visualized, clearly showing performance metrics associated with each subset size, which guided our final selection of variables.
+
+```{r}
+set.seed(123456)
+
+computeRFE <- function(training_data){
+  predictors <- training_data[, -which(names(training_data) == "target")]  # Remove target from predictors
+# Define control for RFE with 5-fold cross-validation
+control <- rfeControl(functions = rfFuncs, method = "cv", number = 10)
+
+# Perform RFE
+rfe_results <- rfe(
+  predictors, 
+  training_data[["target"]], 
+  sizes = c(1:length(predictors)),  # Test different subset sizes
+  rfeControl = control
+)
+
+# rfe_results
+pl <- plot(rfe_results, type = c("g", "o"), main = "RFE Results")
+  return(list(rfe_results,pl))
+}
+
+
+```
+
+#### 3.1 Model 1 (SpatialSign)
+
+For Model 1, recursive feature elimination with 10-fold cross-validation identified nox, rad, ptratio, dis, and age as the top 5 predictors. These selected variables provide a balanced focus on environmental, infrastructure, and socioeconomic factors, maximizing predictive performance while minimizing complexity.
+
+```{r}
+model1_params <- computeRFE(crime_training_m1)
+model1_params[1]
+model1_params[2]
+
+```
+
+***Model 1***
+
+```{r}
+model_a <- glm(target~.,data=crime_training_m1,family = "binomial")
+model_a
+```
+
+***Model 2***
+
+```{r}
+
+
+model_b <- glm(target~nox+age+ptratio+dis+rad,data=crime_training_m1,family = "binomial")
+model_b
+
+```
+
+Model 1 incorporates all available predictors, resulting in a complex structure with a residual deviance of 217.3 and an Akaike Information Criterion (AIC) of 237.3. While it provides a comprehensive view, the complexity may hinder interpretability and ease of implementation.
+
+In contrast, Model 2 utilizes a refined set of predictors selected through Recursive Feature Elimination (RFE), focusing on the most impactful variables.
+
+Model 2 achieves a residual deviance of 226.9 and an AIC of 238.9. Although there is a slight trade-off in fit compared to Model 1, the simplicity and clarity of Model 2 make it a more practical choice.
+
+***Key findings and interpretation***
+
+The selected predictors in Model 2 capture essential factors affecting crime risk without unnecessary complexity. The key insights from the model are:
+
+1.  NOX (Nitrogen Oxides Concentration): A high positive coefficient of 31.38 indicates a strong association between higher pollution levels and increased crime rates. This aligns with the understanding that industrial areas with more pollution may experience more crime due to factors like population density and socioeconomic conditions.
+
+2.  DIS (Distance to Employment Centers): A positive coefficient of 1.30 suggests that neighborhoods farther from employment centers have higher crime rates in this dataset. While this is counterintuitive—since suburban areas are typically considered safer—it may reflect unique socioeconomic factors specific to our area of study.
+
+3.  PTRATIO (Pupil-Teacher Ratio): With a positive coefficient of 0.12539, the model indicates that higher pupil-teacher ratios are associated with increased crime risk. This could imply that areas with strained educational resources may experience more crime due to limited support for youth.
+
+4.  RAD (Accessibility to Highways): A positive coefficient of 0.58459 suggests that greater highway accessibility correlates with higher crime rates. This may be due to increased mobility facilitating criminal activities or the presence of transient populations.
+
+5.  AGE (Proportion of Older Housing): A modest positive coefficient of 0.01917 may indicate that neighborhoods with older housing stock are linked to higher crime rates, possibly due to factors like urban decay or lack of investment in infrastructure.
+
+Therefore, model 2 will be the selected model for the evaluation against other models.
+
+#### 3.2 Model 2 (Yeo-Johnson)
+
+For Model 1, recursive feature elimination with 10-fold cross-validation identified rad, ptratio, age, zn, and rm as the top 5 predictors. These selected variables capture critical aspects of infrastructure, educational resources, neighborhood age, zoning, and housing characteristics, effectively balancing predictive performance while keeping model complexity to a minimum.
+
+```{r}
+model2_params <- computeRFE(crime_training_m2)
+model2_params[1]
+model2_params[2]
+
+```
+
+***Model 1***
+
+```{r}
+model2_a <- glm(target~.,data=crime_training_m2,family = "binomial")
+model2_a
+
+
+```
+
+***Model 2***
+
+```{r}
+
+model2_b <- glm(target~zn+age+ptratio+rm+rad,data=crime_training_m2,family = "binomial")
+model2_b
+```
+
+Model 1 includes all available predictors (zn, rm, age, rad, ptratio, and medv), resulting in a more complex structure with a residual deviance of 284.3 and an AIC of 298.3. This comprehensive approach offers detailed insight into the factors influencing crime risk, but its complexity may reduce interpretability and make the model less practical to implement.
+
+In contrast, Model 2 utilizes a refined set of predictors (zn, age, ptratio, rm, and rad), focusing on the most impactful variables. Model 2 achieves a residual deviance of 285.5 and a slightly lower AIC of 297.5, suggesting that it provides nearly the same predictive power with a simpler and more interpretable structure. This simplicity makes Model 2 a more practical choice for effective decision-making.
+
+***Key Findings and Interpretations***
+
+The selected predictors in Model 2 capture essential factors affecting crime risk, with the following key insights:
+
+1.  ZN (Proportion of Large-Lot Zoning): The model shows a negative coefficient of -1.28756 for zn, indicating that neighborhoods with a higher proportion of large-lot residential zoning tend to have lower crime rates. This result is consistent with expectations, as lower-density areas are generally associated with reduced crime risk.
+
+2.  AGE (Proportion of Older Housing): A positive coefficient of 0.04892 suggests that neighborhoods with older housing stock may experience slightly higher crime rates. This may reflect urban areas where older properties and infrastructure might contribute to social or economic conditions associated with crime.
+
+3.  PTRATIO (Pupil-Teacher Ratio): The negative coefficient of -0.12511 for ptratio is somewhat counterintuitive, as higher pupil-teacher ratios, which imply fewer resources per student, would typically correlate with higher crime rates. This result may point to unique or complex relationships in the data that warrant further investigation.
+
+4.  RM (Average Number of Rooms per Dwelling): In Model 2, rm has a positive coefficient of 1.31848, suggesting that neighborhoods with larger homes may experience higher crime rates. This finding contradicts conventional expectations and the result from Model 1, suggesting potential interactions or unique patterns within the dataset.
+
+5.  RAD (Accessibility to Highways): The positive coefficient of 0.47058 for rad implies that areas with greater access to highways may have higher crime rates. This could be due to increased ease of movement facilitating criminal activity or the presence of transient populations in highly accessible areas.
+
+Therefore, model 2 will be the selected model for the evaluation against other models.
+
+#### 3.3 Model 3 (Log and Winsorization)
+
+For Model 3, recursive feature selection using 10-fold cross-validation identified the top 5 predictors as rad, ptratio, age, zn, and rm. This selection highlights features that contribute substantially to the model’s predictive accuracy, focusing on transportation access (rad), school resources (ptratio), neighborhood age, zoning (zn), and housing characteristics (rm). By prioritizing these variables, the model achieves a balance between predictive performance and interpretability, maintaining a streamlined complexity while retaining essential factors for distinguishing crime risk.
+
+```{r}
+model3_params <- computeRFE(crime_training_m3)
+model3_params[1]
+model3_params[2]
+
+```
+
+***Model 1***
+
+```{r}
+model3_a <- glm(target~.,data=crime_training_m3,family = "binomial")
+model3_a
+
+
+
+```
+
+***Model 2***
+
+```{r}
+model3_b <- glm(target~ptratio+rad+age+rm+zn,data=crime_training_m3,family = "binomial")
+model3_b
+```
+
+Model 1 incorporates all available predictors (zn, rm, age, rad, ptratio, and medv), creating a more complex structure with a residual deviance of 284.6 and an AIC of 298.6. This model provides a comprehensive perspective on the factors that may contribute to crime risk but may introduce complexity that could impact ease of interpretation and implementation.
+
+In contrast, Model 2 utilizes a refined subset of predictors (ptratio, rad, age, rm, and zn), focusing on the most relevant variables. With a residual deviance of 284.7 and a slightly lower AIC of 296.7, Model 2 achieves comparable predictive performance with a simpler structure, making it a more practical choice for application.
+
+***Key Findings and Interpretations***
+
+The predictors in Model 2 capture essential factors affecting crime risk with the following insights:
+
+1.  PTRATIO (Pupil-Teacher Ratio): The model shows a negative coefficient of -0.12419 for ptratio, suggesting that higher pupil-teacher ratios correlate with lower crime rates. This counterintuitive finding might indicate unique dynamics in the data or require further investigation to understand its impact on crime risk.
+
+2.  RAD (Accessibility to Highways): With a positive coefficient of 0.47161, rad suggests that areas with better highway access may experience increased crime. This result could reflect the influence of mobility on criminal activity or indicate transient populations in these areas.
+
+3.  AGE (Proportion of Older Housing): The positive coefficient (0.04765) for age indicates that neighborhoods with older housing stock may be associated with higher crime rates. This finding aligns with potential urban decay in older neighborhoods, which might contribute to crime.
+
+4.  RM (Average Number of Rooms per Dwelling): The positive coefficient (0.22029) for rm implies that neighborhoods with larger homes might experience higher crime rates. This could be due to particular socioeconomic patterns or interactions within the data, as it contrasts with typical expectations that more rooms correlate with lower crime.
+
+5.  ZN (Proportion of Large-Lot Zoning): A negative coefficient of -0.44730 for zn suggests that areas with larger residential lots tend to have lower crime rates, likely due to lower population density and fewer opportunities for crime.
+
+
+Therefore, model 2 will be the selected model for the evaluation against other models.
+
+### 4. Model Selection
+
+In the Model Selection section, we aim to identify the model that best balances predictive accuracy, interpretability, and practical application for our dataset. Selecting an optimal model involves evaluating several candidate models across key performance metrics, such as accuracy, AIC, and residual deviance, as well as considering factors like model complexity and feature importance. By systematically comparing these models, we can pinpoint the approach that maximizes predictive power while maintaining clarity and simplicity.
+
+#### ***4.1 Model 1 (SpatialSign)***
+
+After developing the model 1, we will now use the test data to generate predicted probabilities and predicted classes, enabling us to evaluate model performance through the confusion matrix.
+
+```{r}
+#model 1
+predicted_probability_test = predict(model_b,newdata = crime_test_clean,type = "response" )
+predicted_probability_train = predict(model_b,newdata = crime_training_m1,type = "response" )
+
+m1_crime_train <- crime_training_m1
+m1_crime_train$predicted_target <- ifelse(predicted_probability_train >= 0.5, 1, 0) |> as.factor()
+m1_crime_train$predicted_prob <- predicted_probability_train
+m1_crime_train$modelNumber <- 1
+m1_crime_train$modeltype <- "training"
+
+
+m1_crime_test <- crime_test_clean
+m1_crime_test$predicted_target <- ifelse(predicted_probability_test >= 0.5, 1, 0) |> as.factor()
+m1_crime_test$predicted_prob <- predicted_probability_test
+m1_crime_test$modelNumber <- 1
+m1_crime_test$modeltype <- "test"
+
+```
+
+***Confusion Matrix***
+
+```{r}
+caret_conf_matrix <- confusionMatrix(m1_crime_train$predicted_target, m1_crime_train$target, positive = "1")
+caret_conf_matrix
+```
+
+
+**ROC Curve**\*
+
+```{r message=FALSE, warning=FALSE}
+roc_curve <- roc(m1_crime_train$target, m1_crime_train$predicted_prob)
+auc_value <- auc(roc_curve)
+
+roc_data <- data.frame(
+  specificity = rev(roc_curve$specificities),
+  sensitivity = rev(roc_curve$sensitivities)
+)
+
+
+ggplot(roc_data, aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(color = "blue", size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey") +
+  labs(
+    title = paste("ROC Curve (AUC =", round(auc(roc_curve), 4), ")"),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  scale_x_continuous(limits = c(0, 1)) + 
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal()
+```
+
+This model demonstrates high and well-balanced performance in distinguishing between high and low crime risk areas, with an accuracy of 89.48%. This suggests that the model reliably differentiates between neighborhoods based on crime risk, with a 95% confidence interval ranging from 86.34% to 92.12%. This high accuracy and narrow confidence interval underscore the model’s stability, indicating it will likely perform consistently across various samples.
+
+In terms of classifying each group, the model achieves a sensitivity of 89.08% and a specificity of 89.87%. This means the model successfully identifies 89.08% of high-risk neighborhoods and accurately detects 89.87% of low-risk areas. These balanced sensitivity and specificity values are critical for a model in this context, as they reduce the chances of misclassifying neighborhoods and provide dependable insights into areas that may require attention.
+
+The model’s Positive Predictive Value (PPV) of 89.47% and Negative Predictive Value (NPV) of 89.50% reflect its dependability in predicting true high and low-risk neighborhoods. When it classifies an area as high-risk, it is correct 89.47% of the time, and when it predicts low-risk, it is accurate 89.50% of the time. These high predictive values enhance confidence in the model’s classifications, ensuring stakeholders can rely on its outputs for decisions regarding resource allocation or intervention.
+
+With an AUC (Area Under the Curve) of 0.9622, this model exhibits outstanding discrimination between high and low crime risk areas. An AUC of 0.9622 indicates that the model can correctly rank a randomly chosen high-risk neighborhood above a low-risk one 96.22% of the time, underscoring its strong performance across various thresholds. This flexibility makes the model adaptable for different decision criteria, maintaining reliable performance regardless of threshold adjustments.
+
+Additionally, the model’s Kappa statistic of 0.7896 signifies substantial agreement between its predictions and actual classifications, indicating that it performs well above random chance. The McNemar’s Test p-value of 1 confirms no significant difference in error rates between high and low-risk predictions, underscoring the model’s balanced performance across classes.
+
+#### ***4.2 Model 2 (Yeo-Johnson)***
+
+After developing the model 2, we will now use the test data to generate predicted probabilities and predicted classes, enabling us to evaluate model performance through the confusion matrix.
+
+```{r}
+#model 2
+m2_predicted_probability_test = predict(model2_b,newdata = crime_test_clean2,type = "response" )
+m2_predicted_probability_train = predict(model2_b,newdata = crime_training_m2,type = "response" )
+
+m2_crime_train <- crime_training_m2
+m2_crime_train$predicted_target <- ifelse(m2_predicted_probability_train >= 0.5, 1, 0) |> as.factor()
+m2_crime_train$predicted_prob <- m2_predicted_probability_train
+m2_crime_train$modelNumber <- 2
+m2_crime_train$modeltype <- "training"
+
+m2_crime_test <- crime_test_clean2
+m2_crime_test$predicted_target <- ifelse(m2_predicted_probability_test >= 0.5, 1, 0) |> as.factor()
+m2_crime_test$predicted_prob <- m2_predicted_probability_test
+m2_crime_test$modelNumber <- 2
+m2_crime_test$modeltype <- "test"
+```
+
+```{r}
+caret_conf_matrix <- confusionMatrix(m2_crime_train$predicted_target, m2_crime_train$target, positive = "1")
+caret_conf_matrix
+```
+
+**ROC Curve**\*
+
+```{r message=FALSE, warning=FALSE}
+roc_curve2 <- roc(m2_crime_train$target, m2_crime_train$predicted_prob)
+auc_value2 <- auc(roc_curve2)
+
+roc_data2 <- data.frame(
+  specificity = rev(roc_curve$specificities),
+  sensitivity = rev(roc_curve$sensitivities)
+)
+
+
+ggplot(roc_data2, aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(color = "blue", size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey") +
+  labs(
+    title = paste("ROC Curve (AUC =", round(auc(roc_curve2), 4), ")"),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  scale_x_continuous(limits = c(0, 1)) + 
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal()
+
+```
+
+This model demonstrates strong and balanced performance in classifying high and low crime risk areas, achieving an accuracy of 85.41%, indicating it reliably distinguishes between neighborhoods at different risk levels. The 95% confidence interval of 81.87% to 88.49% underscores that this accuracy is stable, meaning the model’s classifications are consistent and dependable for real-world decision-making.
+
+The model’s sensitivity (84.72%) and specificity (86.08%) reflect a balanced approach in identifying both high and low-risk areas. Sensitivity shows that the model correctly identifies 84.72% of high-risk neighborhoods, ensuring effective detection of areas likely to need intervention. Specificity, at 86.08%, indicates that the model accurately classifies low-risk neighborhoods, minimizing unnecessary false positives. This balance is critical in predictions, as it reduces misclassification and provides stakeholders with reliable insights.
+
+The Positive Predictive Value (85.46%) and Negative Predictive Value (85.36%) further reinforce the model’s prediction quality. For instance, when predicting a high-risk area, it is correct 85.46% of the time, meaning stakeholders can trust the model's classification for neighborhoods that may require resources or interventions.
+
+The model’s AUC (Area Under the Curve) of 0.9377 highlights its strong discriminative ability, showing it can correctly rank a randomly chosen high-risk neighborhood above a low-risk one 93.77% of the time. This high AUC not only validates the model’s accuracy, sensitivity, and specificity but also suggests that it performs well across various thresholds, making it flexible for adjusting decision criteria as needed.
+
+Lastly, the Kappa statistic of 0.708 signifies substantial agreement between the predicted and actual classifications, confirming that the model's performance is significantly above random chance. The McNemar’s Test p-value of 0.9035 further supports this, indicating no significant imbalance in error rates between high and low-risk predictions. Altogether, these metrics make this model a stable and highly effective tool for predicting crime risk, offering precise, actionable insights for resource allocation and intervention strategies.
+
+#### ***4.3 Model 3 (Log and Winsorization)***
+
+After developing the model 3, we will now use the test data to generate predicted probabilities and predicted classes, enabling us to evaluate model performance through the confusion matrix.
+
+```{r}
+#model 2
+m3_predicted_probability_test = predict(model3_b,newdata = crime_test_clean3,type = "response" )
+m3_predicted_probability_train = predict(model3_b,newdata = crime_training_m3,type = "response" )
+
+m3_crime_train <- crime_training_m3
+m3_crime_train$predicted_target <- ifelse(m3_predicted_probability_train >= 0.5, 1, 0) |> as.factor()
+m3_crime_train$predicted_prob <- m3_predicted_probability_train
+m3_crime_train$modelNumber <- 3
+m3_crime_train$modeltype <- "training"
+
+m3_crime_test <- crime_test_clean3
+m3_crime_test$predicted_target <- ifelse(m3_predicted_probability_test >= 0.5, 1, 0) |> as.factor()
+m3_crime_test$predicted_prob <- m3_predicted_probability_test
+m3_crime_test$modelNumber <- 3
+m3_crime_test$modeltype <- "test"
+```
+
+```{r}
+caret_conf_matrix <- confusionMatrix(m3_crime_train$predicted_target, m3_crime_train$target, positive = "1")
+caret_conf_matrix
+```
+
+***ROC Curve***
+
+```{r message=FALSE, warning=FALSE}
+roc_curve3 <- roc(m3_crime_train$target, m3_crime_train$predicted_prob)
+auc_value3 <- auc(roc_curve3)
+
+
+roc_data3 <- data.frame(
+  specificity = rev(roc_curve$specificities),
+  sensitivity = rev(roc_curve$sensitivities)
+)
+
+
+ggplot(roc_data3, aes(x = 1 - specificity, y = sensitivity)) +
+  geom_line(color = "blue", size = 1) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey") +
+  labs(
+    title = paste("ROC Curve (AUC =", round(auc(roc_curve3), 4), ")"),
+    x = "False Positive Rate (1 - Specificity)",
+    y = "True Positive Rate (Sensitivity)"
+  ) +
+  scale_x_continuous(limits = c(0, 1)) + 
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_minimal()
+
+```
+
+This model shows comparable performance to the previous model, with an accuracy of 85.41% and a 95% confidence interval of 81.87% to 88.49%, indicating stable and reliable classification. Its sensitivity (84.72%) and specificity (86.08%) provide balanced detection of both high and low crime risk areas, reducing misclassifications and enhancing its dependability.
+
+The model’s Positive Predictive Value (85.46%) and Negative Predictive Value (85.36%) further affirm its reliability in accurately classifying neighborhoods. The Kappa statistic of 0.708 shows substantial agreement between predicted and actual classifications, while a McNemar’s Test p-value of 0.9035 suggests no bias between error rates for high and low-risk categories.
+
+With an AUC of 0.9378, the model has a strong ability to distinguish between high and low crime risk, similar to the previous model’s AUC of 0.9622. This high AUC indicates flexibility in setting thresholds without compromising accuracy, making it a valuable tool for targeted resource allocation and intervention planning.
+
+#### ***4.4 Model Performance Estimation Using Predicted Probability Distributions***
+
+Since the test data lacks a target variable for directly assessing model performance, we estimated each model’s generalization capability by analyzing the predicted probability distributions. By comparing the distributions of predicted probabilities across the test data, we could infer how each model would likely perform on unseen data, even in the absence of true labels.
+
+To evaluate model performance, we compared the predicted probabilities of each model against the distribution of prediction probabilities in the test data. This comparison provided insights into each model's robustness and ability to generalize. A well-defined, balanced distribution in the test data indicates a model that can consistently separate classes with confidence, while discrepancies between training and test probability distributions might suggest reduced classification power or adaptation to new data. Through this method, we could effectively gauge each model’s reliability and stability across diverse data scenarios.
+
+```{r}
+# Add models as needed
+
+comparison_df <- bind_rows(
+  
+  m1_crime_train,
+  m1_crime_test,
+  m2_crime_train,
+  m2_crime_test,
+    m3_crime_train,
+  m3_crime_test,
+) |> select(modelNumber,modeltype,predicted_prob,)
+
+```
+
+***Probability Distribution***
+
+```{r}
+comparison_df  |> filter(modelNumber == 1)  |> ggplot( aes(x = round(predicted_prob,2), fill = modeltype)) +
+  geom_density(alpha = 0.5) + labs(title = "Probability Distribution Comparison (SpatialSign)",
+       x = "Predicted Probability",
+       y = "Density")
+
+```
+The distribution of predicted probabilities for the training data is characterized by two pronounced peaks at the extremes, with one peak near 0 to 0.25 and another near 0.75 to 1, forming a U-shaped curve with a gentle arc in the middle. These strong peaks suggest that the model, when working with the training data, can confidently assign probabilities close to 0 or close to 1, indicating clear separation between the classes. This sharp concentration of probabilities at both ends implies that the model encounters well-defined patterns in the training data, allowing it to make more definitive classifications with minimal uncertainty.
+
+In contrast, the test data distribution shows a wave-like shape, with milder peaks at both ends and a more gradual arc in the middle. This pattern suggests that while the model still leans toward probabilities close to 0 and close to 1, it does so with less certainty compared to the training data. The less pronounced peaks indicate that the model’s classification on the test data is more balanced and conservative, refraining from the high level of confidence displayed in the training data. The wave-like distribution implies that the model, when faced with new data, may encounter less distinct boundaries between classes, leading it to make cautious predictions rather than polarized ones.
+
+In both distributions, the middle section reveals important insights into the model’s behavior. For the training data, the arc in the middle dips low, reflecting a relative scarcity of probabilities around 0.5, as the model strongly favors one class over the other. This indicates that the training data offers clear distinctions, minimizing ambiguity. In the test data, however, the arc in the middle is more pronounced, indicating that the model produces a fair number of predictions in the mid-range, where probabilities are less extreme. This shape suggests subtle overlaps in the test data, where certain instances don’t align strongly with one class, causing the model to hedge between classes.
+
+Overall, the U-shaped curve of the training data reflects a model that is more confident and polarized in its classifications, while the wave-like distribution in the test data suggests a more balanced and adaptable approach, though one with greater caution and moderate uncertainty. 
+
+
+```{r}
+
+comparison_df  |> filter(modelNumber == 2)  |> ggplot( aes(x = predicted_prob, fill = modeltype)) +
+  geom_density(alpha = 0.5) + labs(title = "Probability Distribution Comparison (Yeo-Johnson)",
+       x = "Predicted Probability",
+       y = "Density")
+
+```
+On the other hand, the training data distribution for the second model displays a W-shaped curve with three distinct peaks: one near 0, one around 0.5, and another close to 1. This W shape, with pronounced peaks at each end and a third, smaller peak in the middle, suggests that the model is confident in assigning probabilities near 0 and 1 for two distinct groups within the classes. However, the middle peak around 0.5 indicates a subset of data points that the model finds ambiguous, assigning them probabilities closer to the midpoint. This middle peak suggests some overlap or mixed characteristics between classes, leading the model to hedge on these instances rather than making a definitive prediction. Thus, the W-shaped distribution reflects a training set where two groups are confidently separated, while a third group is less distinctly aligned with either class, introducing some complexity into the classification.
+
+In contrast, the test data distribution shows two main clusters of predicted probabilities: one mode spanning from 0 to 0.5 and a smaller second mode around 0.7 to 1. This pattern indicates that the model continues to differentiate between classes, assigning more conservative probabilities in the lower range for one class and less frequent, higher probabilities for the other. The larger mode on the left (0 to 0.5) suggests that the model is more often cautious in assigning high confidence to this class in the test data, indicating that it likely encounters less clear boundaries for the left mode in new data. Meanwhile, the smaller peak around 0.7 to 1 reveals fewer high-confidence predictions for the second class, reflecting an adaptation to unseen data that isn’t as sharply separable as in the training set.
+
+
+
+```{r}
+
+comparison_df  |> filter(modelNumber == 3)  |> ggplot( aes(x = predicted_prob, fill = modeltype)) +
+  geom_density(alpha = 0.5) + labs(title = "Probability Distribution Comparison (Log and Winsorization)",
+       x = "Predicted Probability",
+       y = "Density")
+
+
+```
+
+The third model displays a distribution very similar to that of the second model, with a W-shaped curve in the training set and two main clusters in the test set. However, the density for both sets is slightly higher, meaning the probability values are more concentrated in each respective range.
+
+#### ***4.5 Selected Model***
+
+Based on a comprehensive evaluation across multiple metrics, Model 1 (SpatialSign) is the preferred model for predicting high and low crime risk areas due to its well-balanced performance, superior fit, and strong generalization capabilities. Here’s a concise justification incorporating all key findings:
+
+1. ***Goodness-of-Fit:*** Model 1 has the lowest AIC (238.9) and residual deviance (226.9), indicating a superior fit to the training data while maintaining simplicity. These values reflect Model 1’s ability to capture relevant patterns more effectively than Models 2 and 3, which have higher AICs (297 and 296.7, respectively) and greater residual deviances, suggesting a weaker fit.
+
+2. ***Classification Metrics:*** Model 1 outperforms across essential metrics. It achieves an accuracy of 89.48%, higher than the 85.41% accuracy of both Model 2 and Model 3, and demonstrates balanced sensitivity (89.08%) and specificity (89.87%). Additionally, Model 1’s precision (89.47%) and F1 score indicate reliable prediction accuracy across both classes, showing fewer misclassifications and a better ability to correctly identify high- and low-risk areas.
+
+3. ***AUC and Discriminative Power:*** With an AUC of 0.9622, Model 1 displays exceptional ability to distinguish between high-risk and low-risk neighborhoods across probability thresholds. This AUC surpasses Models 2 and 3 (0.9377 and 0.9378), highlighting Model 1’s adaptability and consistent discriminative power, which is crucial for flexible decision-making.
+
+4. ***Predicted Probability Distributions:*** Analysis of the density plots supports Model 1’s robustness. The U-shaped distribution in the training data reflects confident peaks near 0 and 1, indicating strong class separation. The wave-like distribution in the test data shows the model’s effective adaptation to unseen data, even though the test data represents only 8-10% of the training set. This smaller test sample may contribute to less defined patterns in the density plots, which is consistent with the slightly reduced classification power observed in other models. Despite this, Model 1 maintains high confidence and balanced predictions, underscoring its stability in real-world application.
+
