@@ -3,13 +3,13 @@ title: "HW#3:LOGISTIC_REGRESSION"
 author: "Lewris Mota Sanchez, Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh"
 date: "2024-10-31"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
   html_document:
     toc: true
     toc_float: true
     toc_depth: 3
-  pdf_document:
-    toc: true
-    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -189,6 +189,7 @@ Here are the interpretations of each of the predictors used in model 2:
 #### a.3. Model 3: Stepwise Regression for Variable Selection
 
 ```{r}
+library(MASS) 
 model3 <- stepAIC(glm(target ~ ., data = train_data, family = "binomial"), direction = "both")
 summary(model3)
 ```
