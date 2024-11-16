@@ -207,4 +207,31 @@ This has significant positive skewness, but it’s not extreme. If you want to r
 This value also indicates mild positive skewness. Similar to CAR_AGE, no transformation is strictly necessary, but a log transformation could slightly improve the distribution, especially if we are aiming for perfect normality.
 
 
+Now, based on the skewness above, we only need to log-transform the `TARGET_AMT`, and the other two variables that have a slight high skewness:
+
+```{r}
+# Apply log transformation to TARGET_AMT amd the others
+insurance_training$TARGET_AMT_LOG <- log(insurance_training$TARGET_AMT + 1)
+
+insurance_training$KIDSDRIV_LOG <- log(insurance_training$KIDSDRIV + 1)
+insurance_training$HOMEKIDS_LOG <- log(insurance_training$HOMEKIDS + 1)
+```
+
+Let's check the skewness values after the transformations we performed above:
+
+```{r}
+# Check skewness after applying the transformations
+skew_values_after_transformation <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT_LOG", "KIDSDRIV_LOG", "HOMEKIDS_LOG")], skewness, na.rm = TRUE)
+
+# View the skewness values after transformation
+print(skew_values_after_transformation)
+```
+
+That is good progress;
+
+- The log transformation on `TARGET_AMT` has reduced the skewness significantly, but it remains moderately skewed. This is typical for monetary variables. The transformation has improved the distribution but could still benefit from further adjustments.
+
+- The transformation on `KIDSDRIV` has reduced the skewness but it is still quite positive. This suggests that the log transformation helped, but the variable is still somewhat skewed. We should consider another transformation.
+
+- The log transformation on `HOMEKIDS` has reduced the skewness to a more acceptable level, bringing it closer to zero. This variable is now much more normally distributed and ready for modeling.
 
