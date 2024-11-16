@@ -1,0 +1,178 @@
+---
+title: "HW#4_Data621"
+author: "Saloua Daouki"
+date: "2024-11-15"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Necessary Libraries and the data
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(car)
+```
+
+```{r}
+insurance_training <- read.csv("insurance_training_data.csv")
+insurance_evaluation <- read.csv("insurance-evaluation-data.csv")
+```
+
+## 1. Data Exploration:
+
+### a. Mean / Standard Deviation / Median
+
+```{r}
+# Quick exploration
+str(insurance_training)  # Structure of data
+summary(insurance_training)  # Summary statistics
+
+# Check for missing values
+colSums(is.na(insurance_training))
+```
+ 
+The data has 8161 observations and 25 variables (excluding the `INDEX` which won't be used for the analysis).
+
+The primary target variable is `TARGET_FLAG`, a binary indicator representing whether a car was in crash, and the secondary target `TARGET_AMT` indicates the amount of the cost if a car was in crash.
+
+`AGE` has a mean of 44.8 years (SD = 14.3) with a median age of 45, indicating a balanced age distribution.
+`TRAVTIME` (commute time to work) averages 33.5 minutes, with most values clustered between 22 and 44 minutes. A full table of key statistics is included above for reference.
+
+Several variables have missing values:
+
+- `AGE` (6 missing values), `YOJ` (454), `INCOME` (many blanks), and `CAR_AGE` (510).
+We are going to apply imputation strategies to address these gaps. Missing AGE values will be replaced with the median (45 years).
+
+- `YOJ` and `CAR_AGE` will be imputed using their median values (11 and 8 years, respectively).
+`INCOME`, recorded as character strings, will be cleaned and converted to numeric, with missing values replaced by the median.
+
+### b. Bar Chart or Box Plot of the data
+
+#### b.1. Visualize Numeric Variables
+
+```{r}
+# Histogram for AGE
+ggplot(insurance_training, aes(x = AGE)) +
+  geom_histogram(bins = 30, fill = "skyblue", color = "black") +
+  labs(title = "Age Distribution", x = "Age", y = "Frequency")
+
+# Boxplot for CAR_AGE
+ggplot(insurance_training, aes(y = CAR_AGE)) +
+  geom_boxplot(fill = "lightgreen") +
+  labs(title = "Boxplot of CAR_AGE", y = "Car Age")
+
+# Checking correlation between numeric features
+numeric_vars <- sapply(insurance_training, is.numeric)
+correlation_matrix <- cor(insurance_training[, numeric_vars], use = "pairwise.complete.obs")
+print(correlation_matrix)
+```
+The histogram for the variable `AGE` shows an approximately normal distribution, with the highest frequency occurring around the median age of 45.
+
+For `CAR_AGE`, outliers were evident, with the minimum value being -4, indicating that a negtive age doesn't make sense. 
+
+A correlation matrix highlighted several key relationships:
+
+- The target variable `TARGET_FLAG` has a moderate positive correlation with `MVR_PTS` (Motor Vehicle Record Points, 0.22) and `CLM_FREQ` (Claim Frequency, 0.22). These variables are strong candidates for inclusion in the logistic regression model.
+
+- `AGE` and `CAR_AGE` exhibit weak negative correlations with `TARGET_FLAG` (-0.10 each), suggesting limited predictive value.
+
+- `TARGET_AMT` is moderately correlated with `TARGET_FLAG` (0.53), as expected, since claim amounts/cost depend on whether a claim was filed for a crashed car.
+
+#### b.2. Visualize Categorical Variables:
+
+```{r}
+# Bar plot for CAR_TYPE
+ggplot(insurance_training, aes(x = CAR_TYPE)) +
+  geom_bar(fill = "purple") +
+  labs(title = "Car Type Distribution", x = "Car Type", y = "Count") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Bar plot for TARGET_FLAG
+ggplot(insurance_training, aes(x = factor(TARGET_FLAG))) +
+  geom_bar(fill = "orange") +
+  labs(title = "Target Flag Distribution", x = "Target Flag (0 = No Crash, 1 = Crash)", y = "Count")
+```
+Vehicle Types: The dataset includes a variety of vehicle categories, with the most common being SUVs (Z_SUV), accounting for 2,260 entries, followed by:
+
+- Minivans: 2,020 entries
+
+- Pickup Trucks: 1,375 entries
+
+- Sports Cars: 875 entries
+
+- Vans: 750 entries
+
+- Panel Trucks: 700 entries
+
+This distribution highlights a predominance of family-oriented and utility vehicles, potentially influencing claim tendencies.
+
+Target Flag Distribution: The target variable TARGET_FLAG has a highly imbalanced distribution:
+
+- No Crash (0): 6,000 instances (approximately 73.5% of the data).
+
+- Crash (1): 2,100 instances (approximately 26.5%).
+
+The imbalance will be considered in model development, potentially requiring techniques like weighting, oversampling, or undersampling to ensure accurate prediction.
+
+## 2. Data Preparation:
+
+### a. Handling Missing Values:
+
+Since the variables that have missing values are numeric, we are going to impute the missing values using the median.
+
+```{r}
+# Impute missing values for numerical variables with median
+numeric_vars <- sapply(insurance_training, is.numeric)
+insurance_training[numeric_vars] <- lapply(insurance_training[numeric_vars], function(x) ifelse(is.na(x), median(x, na.rm = TRUE), x))
+```
+
+### b. Creating Flags for Missing Values:
+
+```{r}
+# Loop through all variables to create flags for missing values
+for (var in colnames(insurance_training)) {
+  insurance_training[paste0(var, "_FLAG")] <- ifelse(is.na(insurance_training[[var]]), 1, 0)
+}
+
+# Check the new flags columns
+head(insurance_training)
+```
+
+- The paste0(var, "_FLAG") dynamically creates the name for the new flag column based on the original variable name (e.g., if the original variable is AGE, the flag column will be AGE_FLAG).
+
+- ifelse(is.na(insurance_training[[var]]), 1, 0) checks if the value is missing (NA), and if it is, it assigns a 1; otherwise, it assigns a 0.
+
+### c. Transforming data by putting it into buckets:
+
+In this sub-section, we are going to bucketize the continuous variables; `AGE` and `TARGET_AMT`:
+
+```{r}
+# Bucketize AGE into ranges
+insurance_training$AGE_BUCKET <- cut(insurance_training$AGE,
+                                breaks = c(18, 30, 50, 70, Inf),
+                                labels = c("18-30", "31-50", "51-70", "70+"))
+
+# Bucketize TARGET_AMT into categories
+insurance_training$TARGET_AMT_BUCKET <- cut(insurance_training$TARGET_AMT,
+                                       breaks = c(0, 1000, 5000, 10000, Inf),
+                                       labels = c("0-1000", "1001-5000", "5001-10000", "10000+"))
+
+# Check the bucketized varaibles
+table(insurance_training$AGE_BUCKET)
+table(insurance_training$TARGET_AMT_BUCKET)
+```
+### d. Mathematical transforms such as log or square root (or use Box-Cox):
+
