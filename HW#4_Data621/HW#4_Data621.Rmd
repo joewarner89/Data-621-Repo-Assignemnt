@@ -298,12 +298,36 @@ insurance_training$AGE_GROUP <- cut(insurance_training$AGE,
                                labels = c("18-30", "31-50", "51+"))
 ```
 
-Creating Ratio Variable (KIDSDRIV_RATIO)
+Creating Ratio Variable (KIDSDRIV_RATIO):  This gives us a relative measure of how many kids are driving in relation to the parent's age. This might indicate a trend where younger parents might have fewer kids driving or older parents might have more kids in the driving age range. This may impact outcomes like insurance risk or claim amounts.
 
 ```{r}
 # Create a new variable as the ratio of KIDSDRIV to AGE
 insurance_training$KIDSDRIV_RATIO <- insurance_training$KIDSDRIV / insurance_training$AGE
 ```
 
+## 3. BUILD MODELS:
+
+### 3.1 Multiple Linear Regression Models:
+
+#### 3.1.1 Model 1: Using original varaibles
+
+We are going to use the variables; AGE, CAR_AGE, KIDSDRIV_LOG, HOMEKIDS_LOG which are likely to impact the target variable. We use log-transformed TARGET_AMT to handle skewness.
+
+```{r}
+# Multiple Linear Regression - Model 1 (using selected transformed variables)
+model1 <- lm(TARGET_AMT_LOG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, data = insurance_training)
+summary(model1)
+```
+
+#### 3.1.2 Model 2: Stepwise Selection
+
+This technique allows automatic inclusion or exclusion of variables based on AIC (Akaike Information Criterion). It provides a good way to identify the most important predictors while reducing model complexity.
+
+```{r}
+# Multiple Linear Regression - Model 2 (Stepwise Selection)
+model2 <- lm(TARGET_AMT_LOG ~ ., data = insurance_training)
+step_model2 <- step(model2, direction = "both")
+summary(step_model2)
+```
 
 
