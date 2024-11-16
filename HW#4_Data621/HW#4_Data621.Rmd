@@ -26,6 +26,7 @@ library(caret)
 library(car)
 library(e1071)
 library(MASS)
+library(pROC)
 ```
 
 ```{r}
@@ -76,6 +77,9 @@ ggplot(insurance_training, aes(y = CAR_AGE)) +
   geom_boxplot(fill = "lightgreen") +
   labs(title = "Boxplot of CAR_AGE", y = "Car Age")
 
+# Remove rows with missing values
+numeric_data <- na.omit(insurance_training[, sapply(insurance_training, is.numeric)])
+
 # Checking correlation between numeric features
 numeric_vars <- sapply(insurance_training, is.numeric)
 correlation_matrix <- cor(insurance_training[, numeric_vars], use = "pairwise.complete.obs")
@@ -92,6 +96,7 @@ A correlation matrix highlighted several key relationships:
 - `AGE` and `CAR_AGE` exhibit weak negative correlations with `TARGET_FLAG` (-0.10 each), suggesting limited predictive value.
 
 - `TARGET_AMT` is moderately correlated with `TARGET_FLAG` (0.53), as expected, since claim amounts/cost depend on whether a claim was filed for a crashed car.
+
 
 #### b.2. Visualize Categorical Variables:
 
@@ -129,16 +134,22 @@ Target Flag Distribution: The target variable TARGET_FLAG has a highly imbalance
 
 The imbalance will be considered in model development, potentially requiring techniques like weighting, oversampling, or undersampling to ensure accurate prediction.
 
+```{r}
+# identify missing values
+colSums(is.na(insurance_training))
+```
+
+
 ## 2. Data Preparation:
 
 ### a. Handling Missing Values:
 
-Since the variables that have missing values are numeric, we are going to impute the missing values using the median.
+Since the variables that have missing values are numeric, we are going to impute the missing values using the mean.
 
 ```{r}
-# Impute missing values for numerical variables with median
+# Impute missing values for numerical variables with mean
 numeric_vars <- sapply(insurance_training, is.numeric)
-insurance_training[numeric_vars] <- lapply(insurance_training[numeric_vars], function(x) ifelse(is.na(x), median(x, na.rm = TRUE), x))
+insurance_training[numeric_vars] <- lapply(insurance_training[numeric_vars], function(x) ifelse(is.na(x), mean(x, na.rm = TRUE), x))
 ```
 
 ### b. Creating Flags for Missing Values:
@@ -305,6 +316,12 @@ Creating Ratio Variable (KIDSDRIV_RATIO):  This gives us a relative measure of h
 insurance_training$KIDSDRIV_RATIO <- insurance_training$KIDSDRIV / insurance_training$AGE
 ```
 
+```{r}
+# Create a new variable as the ratio of HOMEKIDS to AGE
+insurance_training$HOMEKIDS_RATIO <- insurance_training$HOMEKIDS / insurance_training$AGE
+```
+
+
 ## 3. BUILD MODELS:
 
 ### 3.1 Multiple Linear Regression Models:
@@ -319,15 +336,203 @@ model1 <- lm(TARGET_AMT_LOG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, data 
 summary(model1)
 ```
 
-#### 3.1.2 Model 2: Stepwise Selection
+The model above explains only about 2.67% of the variance in the target variable (
+$R^2=0.0267$), which suggests that while the predictors are statistically significant, they do not account for much of the variability in the target variable.
 
-This technique allows automatic inclusion or exclusion of variables based on AIC (Akaike Information Criterion). It provides a good way to identify the most important predictors while reducing model complexity.
+The significant predictors are AGE, CAR_AGE, KIDSDRIV_LOG, and HOMEKIDS_LOG, with the strongest positive relationship seen in KIDSDRIV_LOG and HOMEKIDS_LOG, while AGE and CAR_AGE have negative relationships with the target variable.
+
+#### 3.1.2. Model 2: Using Transformed Variables
+
+In this model, we’ll use the log-transformed variables for better model stability, which should improve performance by addressing skewness in the data.
 
 ```{r}
-# Multiple Linear Regression - Model 2 (Stepwise Selection)
-model2 <- lm(TARGET_AMT_LOG ~ ., data = insurance_training)
-step_model2 <- step(model2, direction = "both")
-summary(step_model2)
+summary(insurance_training$AGE)
+summary(insurance_training$CAR_AGE)
+summary(insurance_training$KIDSDRIV)
+summary(insurance_training$HOMEKIDS)
 ```
+```{r}
+any(is.na(insurance_training$AGE))
+any(is.na(insurance_training$CAR_AGE))
+any(is.na(insurance_training$KIDSDRIV))
+any(is.na(insurance_training$HOMEKIDS))
+```
+
+
+```{r}
+# Multiple Linear Regression - Model 2 (using log-transformed variables)
+model2 <- lm(TARGET_AMT_LOG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
+             data = insurance_training)
+summary(model2)
+```
+
+The individual predictors (AGE, CAR_AGE, KIDSDRIV_LOG, and HOMEKIDS_LOG) are statistically significant and have the expected signs in terms of their effect on the target variable (TARGET_AMT_LOG).
+
+However, the model fit is weak (with a low R-squared of 0.02669), indicating that these predictors alone do not explain much of the variability in the target variable. There could be other variables or interactions that are not accounted for, or the relationship between predictors and the target may not be linear.
+
+#### 3.1.3 Model 3: Using Interaction Terms
+
+We introduce interaction terms between variables to explore the combined effects of variables on the target.
+
+```{r}
+# Multiple Linear Regression - Model 3 (including interaction terms)
+model3 <- lm(TARGET_AMT_LOG ~ AGE * CAR_AGE + KIDSDRIV_LOG * HOMEKIDS_LOG, data = insurance_training)
+summary(model3)
+```
+
+Adding interaction terms did not substantially improve the model fit. The main effects (AGE, CAR_AGE, KIDSDRIV_LOG, and HOMEKIDS_LOG) remain statistically significant, but the interaction terms are not, suggesting that these interactions do not improve the model's ability to predict TARGET_AMT_LOG.
+
+Model fit is still weak with low R-squared values, meaning the model is not explaining much of the variability in the target. Further steps could include adding additional predictors or exploring non-linear relationships, or possibly using more advanced models such as random forests or boosting.
+
+
+### 3.2. Binary Logistic Regression Models:
+
+Binary logistic regression models predict a binary outcome (0 or 1). We'll predict the TARGET_FLAG (whether a claim happened: 0 = no, 1 = yes).
+
+#### 3.2.1 Model 1: Using Transformed Variables
+
+We’ll start by using some of the transformed variables that are more normally distributed, as they were transformed to reduce skewness and stabilize the model.
+
+```{r}
+# Logistic Regression - Model 1
+log_model1 <- glm(TARGET_FLAG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
+                  family = binomial(link = "logit"), data = insurance_training)
+summary(log_model1)
+```
+
+AGE and CAR_AGE both have a negative relationship with the probability of TARGET_FLAG = 1, meaning as age and car age increase, the likelihood of the target outcome decreases.
+
+KIDSDRIV_LOG and HOMEKIDS_LOG both have positive relationships with the target outcome, meaning that as these variables increase, the likelihood of TARGET_FLAG = 1 increases.
+
+The model's fit is acceptable, but there is room for improvement, as indicated by the residual deviance and AIC.
+
+
+#### 3.2.2 Model 2: Including Interaction Terms
+
+We include interaction terms to explore the effect of variable combinations on the target variable.
+
+```{r}
+# Logistic Regression - Model 3 (including interaction terms + KIDSDRIV_RATIO)
+log_model2 <- glm(TARGET_FLAG ~ AGE * CAR_AGE + KIDSDRIV_RATIO + HOMEKIDS_LOG, 
+                  family = binomial(link = "logit"), data = insurance_training)
+summary(log_model2)
+```
+
+The significant predictors in this model are AGE, KIDSDRIV_RATIO, and HOMEKIDS_LOG, indicating they are important in predicting the outcome (TARGET_FLAG).
+
+The model is not greatly improved by the interaction term (AGE:CAR_AGE), suggesting that there is no strong interaction effect between AGE and CAR_AGE.
+
+The CAR_AGE predictor is marginally significant, suggesting a potential relationship, but it is not as strong as the other variables.
+
+#### 3.3.2 Model 3: Including Interaction Terms+ Other
+
+```{r}
+# Logistic Regression - Model 3 (Including Interaction Terms + KIDSDRIV_RATIO)
+log_model3 <- glm(TARGET_FLAG ~ AGE * CAR_AGE + KIDSDRIV_RATIO + HOMEKIDS_LOG, 
+                          family = binomial(link = "logit"), data = insurance_training)
+summary(log_model3)
+```
+
+AGE and KIDSDRIV_RATIO are the strongest predictors, with KIDSDRIV_RATIO having a particularly large effect on the outcome.
+
+CAR_AGE has a weaker, marginally significant effect, while HOMEKIDS_LOG also contributes significantly to the model.
+
+The interaction between AGE and CAR_AGE does not significantly improve the model.
+
+
+## 4. SELECT MODELS
+
+In this section, we will evaluate the multiple linear regression and binary logistic regression models using various criteria. The goal is to select the models that provide the best balance between performance and interpretability, while also considering the business context and model simplicity. Here, we will explain the criteria used to select the best models, address potential issues such as multi-collinearity, and discuss the relevant model outputs.
+
+### 4.1 Multiple Linear Regression Model
+
+The key objective for the multiple linear regression model is to find the best model that explains the variability in the target variable (TARGET_AMT_LOG).
+
+```{r}
+# Model Evaluation for Multiple Linear Regression - Model 1
+# Check for multicollinearity (VIF)
+vif(model1)  # Variance Inflation Factor (VIF)
+
+# Calculate R-squared, Adjusted R-squared, RMSE, and F-statistic
+summary(model1)
+
+# Plot residuals
+par(mfrow = c(2, 2))
+plot(model1)
+
+# RMSE Calculation
+rmse_model1 <- sqrt(mean(model1$residuals^2))
+
+# Display results
+cat("Adjusted R^2: ", summary(model1)$adj.r.squared, "\n")
+cat("RMSE: ", rmse_model1, "\n")
+cat("F-statistic: ", summary(model1)$fstatistic[1], "\n")
+```
+The model appears to have statistically significant predictors (with very low p-values), but the overall fit is poor as indicated by the low R-squared and adjusted R-squared values. This suggests that while individual predictors like age, car age, and home kids may have a significant relationship with the target variable, the model is not explaining much of the variability in the target variable. Further model refinement or additional predictors may be necessary for a better fit.
+
+### 4.2 4.2 Binary Logistic Regression Model
+
+```{r}
+# Apply log transformation to variables in the evaluation dataset
+insurance_evaluation$KIDSDRIV_LOG <- log(insurance_evaluation$KIDSDRIV + 1)
+insurance_evaluation$HOMEKIDS_LOG <- log(insurance_evaluation$HOMEKIDS + 1)
+```
+
+```{r}
+# Convert TARGET_FLAG to a factor in both datasets
+insurance_training$TARGET_FLAG <- factor(insurance_training$TARGET_FLAG)
+insurance_evaluation$TARGET_FLAG <- factor(insurance_evaluation$TARGET_FLAG)
+```
+
+
+```{r}
+# Check levels after conversion
+levels(insurance_training$TARGET_FLAG)
+levels(insurance_evaluation$TARGET_FLAG)
+```
+
+
+```{r}
+# Relevel the TARGET_FLAG in the evaluation dataset to match the training dataset
+insurance_evaluation$TARGET_FLAG <- factor(insurance_evaluation$TARGET_FLAG, levels = levels(insurance_training$TARGET_FLAG))
+```
+
+
+```{r}
+# Logistic Regression Model (for TARGET_FLAG)
+log_model1 <- glm(TARGET_FLAG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
+                  family = binomial, data = insurance_training)
+
+# AIC and Log-Likelihood
+log_model1_aic <- AIC(log_model1)
+log_model1_ll <- logLik(log_model1)
+
+# Make predictions
+log_model1_preds <- predict(log_model1, newdata = insurance_evaluation, type = "response")
+log_model1_class <- ifelse(log_model1_preds > 0.5, 1, 0)  # Convert probabilities to binary predictions
+
+# Confusion Matrix
+library(caret)
+conf_matrix <- confusionMatrix(as.factor(log_model1_class), as.factor(insurance_evaluation$TARGET_FLAG))
+
+# Display Metrics
+cat("AIC: ", log_model1_aic, "\n")
+cat("Log-Likelihood: ", log_model1_ll, "\n")
+cat("Accuracy: ", conf_matrix$overall['Accuracy'], "\n")
+cat("Precision: ", conf_matrix$byClass['Pos Pred Value'], "\n")
+cat("Sensitivity: ", conf_matrix$byClass['Sensitivity'], "\n")
+cat("Specificity: ", conf_matrix$byClass['Specificity'], "\n")
+cat("F1 Score: ", conf_matrix$byClass['F1'], "\n")
+
+# ROC Curve and AUC
+roc_curve <- roc(insurance_evaluation$TARGET_FLAG, log_model1_preds)
+cat("AUC: ", auc(roc_curve), "\n")
+plot(roc_curve)
+
+```
+
+
+
+
 
 
