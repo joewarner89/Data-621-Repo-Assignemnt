@@ -174,5 +174,9 @@ insurance_training$TARGET_AMT_BUCKET <- cut(insurance_training$TARGET_AMT,
 table(insurance_training$AGE_BUCKET)
 table(insurance_training$TARGET_AMT_BUCKET)
 ```
+By bucketizing `AGE` into discrete categories, it makes the variable easier to interpret and analyze. Similarly, bucketizing `TARGET_AMT` helps transform a continuous variable with potentially high variation into manageable categories. This can help with clearer reporting and analysis of trends.
+
 ### d. Mathematical transforms such as log or square root (or use Box-Cox):
+
+
 
