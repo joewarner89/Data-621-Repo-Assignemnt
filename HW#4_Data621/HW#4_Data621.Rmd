@@ -493,7 +493,7 @@ cat("F-statistic: ", summary(model1)$fstatistic[1], "\n")
 ```
 The model appears to have statistically significant predictors (with very low p-values), but the overall fit is poor as indicated by the low R-squared and adjusted R-squared values. This suggests that while individual predictors like age, car age, and home kids may have a significant relationship with the target variable, the model is not explaining much of the variability in the target variable. Further model refinement or additional predictors may be necessary for a better fit.
 
-###  Calculate AIC and Adjusted R²:
+###  4.2 Calculate AIC and Adjusted R²:
 
 
 ```{r}
@@ -552,7 +552,7 @@ cat("Model 2: AIC =", aic_log_model2, "\n")
 cat("Model 3: AIC =", aic_log_model3, "\n")
 ```
 
-### Select Models Based on Metrics:
+### 4.3 Select Models Based on Metrics:
 
 **Linear Regression Models**
 
