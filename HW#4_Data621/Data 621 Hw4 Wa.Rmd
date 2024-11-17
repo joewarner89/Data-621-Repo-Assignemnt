@@ -1,0 +1,885 @@
+---
+title: "DATA 621 HW4 WA"
+author: "Warner Alexis"
+date: "2024-11-17"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction 
+The objective is to build two models using the provided dataset: a multiple linear regression model to predict the cost of a car crash (a continuous variable) and a binary logistic regression model to predict the probability of a car crash (a binary outcome). Only the given variables, or any new variables derived from them, can be used to build these models. The dataset includes a set of variables relevant to the prediction task, which are described in the following section.
+
+![Project Data](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 621 - Data Mining\week 12\Screenshot 2024-11-17 122322.png)
+
+
+```{r, warning=FALSE}
+
+library(dplyr)
+library(ggplot2)
+library(DataExplorer)
+library(caret)
+library(car)
+library(e1071)
+library(MASS)
+library(pROC)
+library(VIM)
+```
+
+## Data Exploration
+The training dataset consists of 8,161 observations and 26 variables. Several categorical variables require transformation to be compatible with both logistic and linear models. We begin with some fundamental transformations.
+
+
+```{r pressure, echo=FALSE}
+insurance_training <- read.csv("insurance_training_data.csv")
+insurance_evaluation <- read.csv("insurance-evaluation-data.csv")
+
+# Quick exploration
+str(insurance_training)  # Structure of data
+summary(insurance_training)  # Summary statistics
+
+# Check for missing values
+colSums(is.na(insurance_training))
+```
+
+
+The first graph displays the distribution of the `TARGET_FLAG` variable, which indicates whether a crash occurred (`1`) or did not occur (`0`). The majority of observations fall into the "No Crash (0)" category, with over 6,000 instances, while a smaller portion represents the "Crash (1)" category. This suggests a significant class imbalance in the dataset. To address this imbalance, techniques such as resampling (oversampling the minority class or undersampling the majority class) or weighted models may be necessary to prevent bias toward the majority class.
+
+The second graph provides an overview of missing data in the dataset. The left plot illustrates the proportion of missing data for each variable, showing that `CAR_AGE` and `AGE` have the highest proportion of missing data (around 6% each), while most other variables have little to no missing values. The right plot visualizes the pattern of missing data, with red sections representing missing values and blue sections indicating observed data. The missing data is primarily concentrated in `CAR_AGE` and `AGE`, while the majority of the dataset is complete. To handle this, imputation strategies such as replacing missing values with the mean or median, or predictive imputation, can be employed. Alternatively, rows with missing data can be excluded if they represent a small percentage of the dataset. Proper handling of missing data is crucial for ensuring the quality and reliability of the modeling process.
+
+
+
+
+
+```{r, warning=FALSE}
+
+training_data <- insurance_training
+# Missing Data Visualization
+aggr(training_data, col = c('navyblue', 'red'), numbers = TRUE, sortVars = TRUE, labels = names(training_data), 
+     cex.axis = 0.7, gap = 3, ylab = c("Missing data", "Pattern"))
+
+
+# Summary statistic 
+numeric_vars <- training_data %>% select_if(is.numeric)
+plot_histogram(training_data)
+DataExplorer::plot_histogram(training_data)
+
+library(ggplot2)
+# Ananlyze response variables 
+# Explore TARGET_FLAG
+table(training_data$TARGET_FLAG)
+ggplot(training_data, aes(x = as.factor(TARGET_FLAG))) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Distribution of TARGET_FLAG", x = "Crash (1) / No Crash (0)", y = "Count")
+
+# Explore TARGET_AMT
+ggplot(training_data, aes(x = TARGET_AMT)) +
+  geom_histogram(fill = "darkgreen", bins = 30) +
+  labs(title = "Distribution of TARGET_AMT", x = "Cost of Crash", y = "Count") +
+  xlim(0, quantile(training_data$TARGET_AMT, 0.95))  # Trim extreme outliers
+
+```
+
+
+
+The graphic illustrates the relationship between several predictor variables (e.g., "Driving Children," "Age of Driver") and a target variable, with the red line indicating trends in predicted probabilities. Some variables, like "Age of Driver," show a linear relationship, as the probability decreases steadily with age. Others, like "Driving Children" and "Distance to Work," exhibit non-linear trends, where the probability increases or changes in a curved manner. For variables with linear relationships, no transformations are needed, while non-linear relationships may require transformations (e.g., logarithmic or polynomial terms) or the use of splines to better capture the trends. Additionally, interaction terms may be needed if relationships between variables are interdependent. Finally, it is essential to check for multicollinearity and reassess residuals after modeling to ensure the relationships are accurately captured.
+
+
+```{r, warning=FALSE}
+# Correlation plot for numeric variables
+library(corrplot)
+corr_matrix <- cor(numeric_vars, use = "complete.obs")
+corrplot(corr_matrix, method = "circle", type = "lower", tl.col = "black", tl.cex = 0.7)
+corrplot(corr_matrix,method = 'number')
+
+#  Check to see if relation ship are linear 
+
+
+# relationship with Target flap
+# Boxplot of AGE by TARGET_FLAG
+ggplot(training_data, aes(x = as.factor(TARGET_FLAG), y = AGE)) +
+  geom_boxplot(fill = "purple", alpha = 0.7) +
+  labs(title = "Boxplot of AGE by TARGET_FLAG", x = "Crash (1) / No Crash (0)", y = "Age")
+
+# Categorical variable distribution by TARGET_FLAG
+ggplot(training_data, aes(x = CAR_TYPE, fill = as.factor(TARGET_FLAG))) +
+  geom_bar(position = "dodge") +
+  labs(title = "Car Type by TARGET_FLAG", x = "Car Type", y = "Count", fill = "Crash (1)/No Crash (0)")
+
+```
+
+
+
+```{r}
+
+library(popbio)
+numeric_vars <- numeric_vars %>% mutate(across(where(is.character), ~ suppressWarnings(as.numeric(.))))
+x <- training_data[,]
+x <- x[!is.na(x$AGE) & is.finite(x$AGE), ]
+x$AGE <- as.numeric(as.character(x$AGE))
+x$YOJ <- as.numeric(as.character(x$YOJ))
+x$CAR_AGE <- as.numeric(as.character(x$CAR_AGE))
+
+
+par(mfrow=c(3,3))
+logi.hist.plot(x$KIDSDRIV,x$TARGET_FLAG,logi.mod = 1, type="p", boxp=FALSE,col="gray", mainlabel = "Driving Children")
+
+logi.hist.plot(x$AGE, x$TARGET_FLAG,logi.mod = 1, type="hist",boxp=FALSE,col="gray", mainlabel = "Age of Driver")
+logi.hist.plot(x$HOMEKIDS,x$TARGET_FLAG,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "Children at Home")
+x <- x[!is.na(x$YOJ) & is.finite(x$YOJ), ]
+logi.hist.plot(x$YOJ, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "Years on Job")
+#logi.hist.plot(x$INCOME,x$TARGET_FLAG,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "rm")
+logi.hist.plot(x$TRAVTIME       , x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "Distance to Work")
+#logi.hist.plot(x$HOME_VAL   ,x$TARGET_FLAG,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "dis")
+#logi.hist.plot(x$MSTATUS    , x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "rad")
+#logi.hist.plot(x$SEX        ,x$TARGET_FLAG,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "tax")
+#logi.hist.plot(x$BLUEBOOK     , x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "ptratio")
+#logi.hist.plot(x$black,x$TARGET_FLAG,logi.mod = 1,boxp=FALSE,type="hist",col="gray", mainlabel = "black")
+logi.hist.plot(x$TIF, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "Time in Force")
+#logi.hist.plot(x$RED_CAR , x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "medv")
+#logi.hist.plot(x$OLDCLAIM, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "lstat")
+logi.hist.plot(x$CLM_FREQ, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "Claims (Past 5 Years)")
+#logi.hist.plot(x$REVOKED, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "lstat")
+#logi.hist.plot(x$VR_PTS, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "lstat")
+x <- x[!is.na(x$CAR_AGE) & is.finite(x$CAR_AGE), ]
+logi.hist.plot(x$CAR_AGE, x$TARGET_FLAG,logi.mod = 1,type="hist",boxp=FALSE,col="gray", mainlabel = "Vehicle Age")
+
+```
+
+
+# Conversion of Categoricall values to Numerical Values
+
+The data has 8161 observations and 25 variables (excluding the `INDEX` which won't be used for the analysis).
+
+The primary target variable is `TARGET_FLAG`, a binary indicator representing whether a car was in crash, and the secondary target `TARGET_AMT` indicates the amount of the cost if a car was in crash.
+
+`AGE` has a mean of 44.8 years (SD = 14.3) with a median age of 45, indicating a balanced age distribution.
+`TRAVTIME` (commute time to work) averages 33.5 minutes, with most values clustered between 22 and 44 minutes. A full table of key statistics is included above for reference.
+
+Several variables have missing values:
+
+- `AGE` (6 missing values), `YOJ` (454), `INCOME` (many blanks), and `CAR_AGE` (510).
+We are going to apply imputation strategies to address these gaps. Missing AGE values will be replaced with the median (45 years).
+
+- `YOJ` and `CAR_AGE` will be imputed using their median values (11 and 8 years, respectively).
+`INCOME`, recorded as character strings, will be cleaned and converted to numeric, with missing values replaced by the median.
+
+
+
+```{r,error=FALSE}
+
+# Convert columns with dollar signs to numeric
+convert_to_numeric <- function(column) {
+  as.numeric(gsub("[$,]", "", column))
+}
+
+training_data$INCOME <- convert_to_numeric(training_data$INCOME)
+training_data$HOME_VAL <- convert_to_numeric(training_data$HOME_VAL)
+training_data$BLUEBOOK <- convert_to_numeric(training_data$BLUEBOOK)
+training_data$OLDCLAIM <- convert_to_numeric(training_data$OLDCLAIM)
+
+training_data$INCOME[is.na(training_data$INCOME)] <- median(training_data$INCOME, na.rm = TRUE)
+training_data$HOME_VAL[is.na(training_data$HOME_VAL)] <- median(training_data$HOME_VAL, na.rm = TRUE)
+training_data$BLUEBOOK[is.na(training_data$BLUEBOOK)] <- median(training_data$BLUEBOOK, na.rm = TRUE)
+training_data$OLDCLAIM[is.na(training_data$OLDCLAIM)] <- median(training_data$OLDCLAIM, na.rm = TRUE)
+
+### See the categorical Values 
+table(training_data$PARENT1)
+table(training_data$MSTATUS)
+table(training_data$URBANICITY)
+table(training_data$REVOKED )
+table(training_data$RED_CAR)
+table(training_data$SEX)
+table(training_data$CAR_TYPE)# require more work
+table(training_data$CAR_USE)
+table(training_data$EDUCATION)
+# Convert categorical variable 
+training_data$PARENT1 <- ifelse(training_data$PARENT1 == "Yes", 1, 0) # 1 for Yes and 0 for No
+training_data$MSTATUS <- ifelse(training_data$MSTATUS == "Yes", 1, 0) # 1 for Yes and 0 z_NO
+training_data$URBANICITY <- ifelse(training_data$URBANICITY == "Highly Urban/ Urban", 1, 0) #### Highly Urban/ Urban 1 and 0 z_Highly Rural/ Rural
+training_data$REVOKED  <- ifelse(training_data$REVOKED  == "Yes", 1, 0) # 1 for Yes and 0 for No
+training_data$RED_CAR <- ifelse(training_data$RED_CAR == "yes", 1, 0) # 1 for Yes and 0 for No
+training_data$SEX  <- ifelse(training_data$SEX  == "M", 1, 0) # 1 for M and 0 for z_F
+training_data$CAR_USE <- ifelse(training_data$CAR_USE == "Private", 1, 0)  # 1 for Private and 0 for Commercial 
+
+# Convert CAR_TYPE to a factor and then to numeric
+training_data$CAR_TYPE <- as.numeric(as.factor(training_data$CAR_TYPE))
+# Check the mapping of levels to numbers
+levels(as.factor(training_data$CAR_TYPE)) # # Convert CAR_TYPE to a factor and then to numeric 
+# Minivan Panel = 1 Truck =2      Pickup= 3  Sports Car = 4        Van = 5      z_SUV = 6
+
+
+# Convert EDUCATION to a factor and then to numeric
+training_data$EDUCATION <- as.numeric(as.factor(training_data$EDUCATION))
+# Check the mapping of levels to numbers
+levels(as.factor(training_data$EDUCATION)) 
+
+summary(training_data)
+
+
+```
+
+
+
+### b. Creating Flags for Missing Values:
+
+```{r}
+
+insurance_training <- training_data
+# Loop through all variables to create flags for missing values
+for (var in colnames(insurance_training)) {
+  insurance_training[paste0(var, "_FLAG")] <- ifelse(is.na(insurance_training[[var]]), 1, 0)
+}
+
+# Check the new flags columns
+head(insurance_training)
+```
+
+
+
+- The paste0(var, "_FLAG") dynamically creates the name for the new flag column based on the original variable name (e.g., if the original variable is AGE, the flag column will be AGE_FLAG).
+
+- ifelse(is.na(insurance_training[[var]]), 1, 0) checks if the value is missing (NA), and if it is, it assigns a 1; otherwise, it assigns a 0.
+
+### c. Transforming data by putting it into buckets:
+
+In this sub-section, we are going to bucketize the continuous variables; `AGE` and `TARGET_AMT`:
+
+
+```{r}
+# Bucketize AGE into ranges
+insurance_training$AGE_BUCKET <- cut(insurance_training$AGE,
+                                breaks = c(18, 30, 50, 70, Inf),
+                                labels = c("18-30", "31-50", "51-70", "70+"))
+
+# Bucketize TARGET_AMT into categories
+insurance_training$TARGET_AMT_BUCKET <- cut(insurance_training$TARGET_AMT,
+                                       breaks = c(0, 1000, 5000, 10000, Inf),
+                                       labels = c("0-1000", "1001-5000", "5001-10000", "10000+"))
+
+# Check the bucketized varaibles
+table(insurance_training$AGE_BUCKET)
+table(insurance_training$TARGET_AMT_BUCKET)
+```
+
+
+
+By bucketizing `AGE` into discrete categories, it makes the variable easier to interpret and analyze. Similarly, bucketizing `TARGET_AMT` helps transform a continuous variable with potentially high variation into manageable categories. This can help with clearer reporting and analysis of trends.
+
+### d. Mathematical transforms such as log or square root (or use Box-Cox):
+
+First and to have a clear decision about the type of transformation based on the skewness of each variable:
+
+
+
+```{r}
+library(moments)
+# Check skewness for numeric variables
+skew_values <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT", "KIDSDRIV", "HOMEKIDS")], skewness, na.rm = TRUE)
+
+# View skewness values
+print(skew_values)
+```
+
+Interpretations: 
+
+- `AGE`: -0.03
+This value is close to 0, indicating that the AGE variable is approximately normally distributed. No transformation is needed.
+
+- `CAR_AGE`: 0.29
+The skewness of CAR_AGE is slightly positive, but it is relatively close to 0, meaning it is only mildly skewed. We may not need a transformation for this variable, as the skewness is not severe. 
+
+- `TARGET_AMT`: 8.71
+This is highly positively skewed, with a skewness greater than 1. This suggests that TARGET_AMT has a long right tail, which is typical for monetary data. **A log transformation** would be helpful in normalizing this variable.
+
+- `KIDSDRIV`: 3.35
+This has significant positive skewness, but it’s not extreme. If you want to reduce the skewness, you could consider a log transformation, but it might not be absolutely necessary if the model can handle the skewness well.
+
+- `HOMEKIDS`: 1.34
+This value also indicates mild positive skewness. Similar to CAR_AGE, no transformation is strictly necessary, but a log transformation could slightly improve the distribution, especially if we are aiming for perfect normality.
+
+
+Now, based on the skewness above, we only need to log-transform the `TARGET_AMT`, and the other two variables that have a slight high skewness:
+
+
+
+```{r}
+# Apply log transformation to TARGET_AMT amd the others
+insurance_training$TARGET_AMT_LOG <- log(insurance_training$TARGET_AMT + 1)
+
+insurance_training$KIDSDRIV_LOG <- log(insurance_training$KIDSDRIV + 1)
+insurance_training$HOMEKIDS_LOG <- log(insurance_training$HOMEKIDS + 1)
+```
+
+Let's check the skewness values after the transformations we performed above:
+
+```{r}
+# Check skewness after applying the transformations
+skew_values_after_transformation <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT_LOG", "KIDSDRIV_LOG", "HOMEKIDS_LOG")], skewness, na.rm = TRUE)
+
+# View the skewness values after transformation
+print(skew_values_after_transformation)
+```
+
+
+
+
+That is good progress;
+
+- The log transformation on `TARGET_AMT` has reduced the skewness significantly, but it remains moderately skewed. This is typical for monetary variables. The transformation has improved the distribution but could still benefit from further adjustments.
+
+- The transformation on `KIDSDRIV` has reduced the skewness but it is still quite positive. This suggests that the log transformation helped, but the variable is still somewhat skewed. We should consider another transformation.
+
+- The log transformation on `HOMEKIDS` has reduced the skewness to a more acceptable level, bringing it closer to zero. This variable is now much more normally distributed and ready for modeling.
+
+One additional tranformation that can help us normalize the continuous variable `TARGET_AMT`is Box-Cox Transformation
+
+
+
+```{r}
+insurance_training$TARGET_AMT_SHIFTED <- insurance_training$TARGET_AMT + 1
+boxcox_result <- boxcox(TARGET_AMT_SHIFTED ~ 1, data = insurance_training)
+lambda <- boxcox_result$x[which.max(boxcox_result$y)]
+insurance_training$TARGET_AMT_BOXCOX <- (insurance_training$TARGET_AMT_SHIFTED^lambda - 1) / lambda
+```
+
+
+we can also perform the square root transformation:
+
+```{r}
+insurance_training$TARGET_AMT_SQRT <- sqrt(insurance_training$TARGET_AMT)
+```
+
+Let's do the same thing for the variable `KIDSDRIV`:
+
+First, Box-Cox:
+
+```{r}
+insurance_training$KIDSDRIV_BOXCOX <- (insurance_training$KIDSDRIV + 1)^lambda - 1
+```
+
+Then, we can use Cube Root transformation:
+
+```{r}
+insurance_training$KIDSDRIV_CUBE <- sign(insurance_training$KIDSDRIV) * abs(insurance_training$KIDSDRIV)^(1/3)
+```
+
+Let's check once more for after-transformations-skewness 
+
+```{r}
+# Check skewness after applying the transformations
+skew_values_after_transformation2 <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT_BOXCOX", "KIDSDRIV_BOXCOX", "HOMEKIDS_LOG")], skewness, na.rm = TRUE)
+
+# View the skewness values after transformation
+print(skew_values_after_transformation2)
+```
+
+
+
+
+```{r}
+# Check skewness after applying the transformations
+skew_values_after_transformation3 <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT_SQRT", "KIDSDRIV_CUBE", "HOMEKIDS_LOG")], skewness, na.rm = TRUE)
+
+# View the skewness values after transformation
+print(skew_values_after_transformation3)
+```
+
+Based on the transformations above:
+
+- `TARGET_AMT`: Box-Cox was more effective in reducing skewness compared to the square root or cube transformations. While for `KIDSDRIV`, Box-Cox made the variable more negatively skewed, whereas cube transformation made it more positively skewed. Neither transformation worked well. So we better keep the _CUBE or find another approach for this variable.
+
+### e. Creating New Variables:
+
+Age-based Grouping (AGE_GROUP): Age is a continuous variable, but for the purposes of analysis and modeling, grouping it into categories allows us to better understand trends in different age ranges. For example, it might be valuable to compare the behavior of individuals in their 20s versus those in their 50s when it comes to claims or risk.
+
+```{r}
+# Create age groups
+insurance_training$AGE_GROUP <- cut(insurance_training$AGE, 
+                               breaks = c(18, 30, 50, Inf), 
+                               labels = c("18-30", "31-50", "51+"))
+```
+
+Creating Ratio Variable (KIDSDRIV_RATIO):  This gives us a relative measure of how many kids are driving in relation to the parent's age. This might indicate a trend where younger parents might have fewer kids driving or older parents might have more kids in the driving age range. This may impact outcomes like insurance risk or claim amounts.
+
+```{r}
+# Create a new variable as the ratio of KIDSDRIV to AGE
+insurance_training$KIDSDRIV_RATIO <- insurance_training$KIDSDRIV / insurance_training$AGE
+```
+
+```{r}
+# Create a new variable as the ratio of HOMEKIDS to AGE
+insurance_training$HOMEKIDS_RATIO <- insurance_training$HOMEKIDS / insurance_training$AGE
+```
+
+
+```{r}
+# Check skewness after applying the transformations
+skew_values_after_transformation3 <- sapply(insurance_training[, c("AGE", "CAR_AGE", "TARGET_AMT_SQRT", "KIDSDRIV_CUBE", "HOMEKIDS_LOG")], skewness, na.rm = TRUE)
+
+# View the skewness values after transformation
+print(skew_values_after_transformation3)
+```
+
+Based on the transformations above:
+
+- `TARGET_AMT`: Box-Cox was more effective in reducing skewness compared to the square root or cube transformations. While for `KIDSDRIV`, Box-Cox made the variable more negatively skewed, whereas cube transformation made it more positively skewed. Neither transformation worked well. So we better keep the _CUBE or find another approach for this variable.
+
+### e. Creating New Variables:
+
+Age-based Grouping (AGE_GROUP): Age is a continuous variable, but for the purposes of analysis and modeling, grouping it into categories allows us to better understand trends in different age ranges. For example, it might be valuable to compare the behavior of individuals in their 20s versus those in their 50s when it comes to claims or risk.
+
+```{r}
+# Create age groups
+insurance_training$AGE_GROUP <- cut(insurance_training$AGE, 
+                               breaks = c(18, 30, 50, Inf), 
+                               labels = c("18-30", "31-50", "51+"))
+```
+
+Creating Ratio Variable (KIDSDRIV_RATIO):  This gives us a relative measure of how many kids are driving in relation to the parent's age. This might indicate a trend where younger parents might have fewer kids driving or older parents might have more kids in the driving age range. This may impact outcomes like insurance risk or claim amounts.
+
+```{r}
+# Create a new variable as the ratio of KIDSDRIV to AGE
+insurance_training$KIDSDRIV_RATIO <- insurance_training$KIDSDRIV / insurance_training$AGE
+```
+
+
+## 3. BUILD MODELS:
+
+### 3.1 Multiple Linear Regression Models:
+
+#### 3.1.1 Model 1: Using original varaibles
+
+We are going to use the variables; AGE, CAR_AGE, KIDSDRIV_LOG, HOMEKIDS_LOG which are likely to impact the target variable. We use log-transformed TARGET_AMT to handle skewness.
+
+```{r}
+# Multiple Linear Regression - Model 1 (using selected transformed variables)
+model_1 <- lm(TARGET_AMT_LOG ~ AGE + CAR_AGE + BLUEBOOK + KIDSDRIV_LOG + HOMEKIDS_LOG + MVR_PTS, data = insurance_training)
+summary(model_1)
+
+
+# Plot Residuals vs Fitted Values
+plot(model_1$fitted.values, resid(model_1),
+     xlab = "Fitted Values",
+     ylab = "Residuals",
+     main = "Residuals vs Fitted Values",
+     pch = 20, col = "blue")
+abline(h = 0, col = "red", lty = 2)
+
+# Histogram of Residuals
+hist(resid(model_1), 
+     breaks = 30, 
+     main = "Histogram of Residuals", 
+     xlab = "Residuals",
+     col = "lightblue")
+
+# Generate diagnostic plots for model_1
+par(mfrow = c(2, 2))  # Display 4 plots in a 2x2 layout
+plot(model_1)
+
+
+
+```
+
+
+The linear regression model predicts the log-transformed crash cost (`TARGET_AMT_LOG`) using six predictors: `AGE`, `CAR_AGE`, `BLUEBOOK`, `KIDSDRIV_LOG`, `HOMEKIDS_LOG`, and `MVR_PTS`. All predictors are statistically significant, with `MVR_PTS` (traffic violations) showing the strongest positive association with crash costs, while `CAR_AGE` and `BLUEBOOK` have negative effects. The model explains 7.4% of the variance in crash costs, as indicated by the R-squared value, which is relatively low and suggests limited predictive strength. The residuals range from -6.402 to 10.166, indicating some large prediction errors, and the residual standard error is 3.528. While the F-statistic shows the model is statistically significant overall (p < 2.2e-16), the low R-squared and large residuals highlight its limited practical utility. Future improvements could include adding more predictors, testing for non-linear relationships, or using advanced modeling techniques. Further diagnostics, such as residual analysis and multicollinearity checks, are recommended to refine the model.
+
+The residuals on this graph indicate that the linear regression model does not fit the data well. A clear curved pattern in the residuals suggests that the model fails to capture the underlying relationship between the predictors and the target variable, violating the assumption of linearity. Additionally, the funnel-shaped spread of residuals as the fitted values increase indicates heteroscedasticity, meaning the variance of the residuals is not constant, which can lead to inefficient estimates and unreliable statistical inferences. The presence of extreme points at the bottom right corner suggests potential outliers or high-leverage points, which could heavily influence the regression results. Overall, this residual plot highlights the need to consider non-linear transformations of predictors, address heteroscedasticity using weighted regression or response variable transformations, and investigate outliers or leverage points to improve the model fit.
+
+This diagnostic plot provides a detailed evaluation of the linear regression model through four key panels. The Residuals vs Fitted plot (top left) shows a curved pattern, indicating that the model does not adequately capture the relationship between the predictors and the target variable, violating the assumption of linearity. Additionally, the spread of residuals increases with fitted values, suggesting heteroscedasticity, where the variance of residuals is not constant. The Normal Q-Q plot (top right) shows deviations from the diagonal line, particularly at the tails, indicating that the residuals are not normally distributed. The Scale-Location plot (bottom left) reinforces the issue of heteroscedasticity, as the residual spread increases with fitted values, shown by the upward trend. Finally, the Residuals vs Leverage plot (bottom right) highlights potential influential observations with high leverage or large residuals, as indicated by points near or beyond Cook’s distance lines. Overall, these diagnostics suggest the need for model improvements, such as including non-linear terms, addressing heteroscedasticity, and handling influential data points.
+
+
+In this model, we’ll use the log-transformed variables for better model stability, which should improve performance by addressing skewness in the data.
+
+```{r}
+summary(insurance_training$AGE)
+summary(insurance_training$CAR_AGE)
+summary(insurance_training$KIDSDRIV)
+summary(insurance_training$HOMEKIDS)
+```
+```{r}
+any(is.na(insurance_training$AGE))
+any(is.na(insurance_training$CAR_AGE))
+any(is.na(insurance_training$KIDSDRIV))
+any(is.na(insurance_training$HOMEKIDS))
+```
+
+
+
+```{r}
+# Multiple Linear Regression - Model 2 (using log-transformed variables)
+model2 <- lm(TARGET_AMT_LOG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
+             data = insurance_training)
+summary(model2)
+
+# Generate diagnostic plots for model_1
+par(mfrow = c(2, 2))  # Display 4 plots in a 2x2 layout
+plot(model2)
+```
+
+The individual predictors (AGE, CAR_AGE, KIDSDRIV_LOG, and HOMEKIDS_LOG) are statistically significant and have the expected signs in terms of their effect on the target variable (TARGET_AMT_LOG).
+
+However, the model fit is weak (with a low R-squared of 0.02669), indicating that these predictors alone do not explain much of the variability in the target variable. There could be other variables or interactions that are not accounted for, or the relationship between predictors and the target may not be linear.
+
+The diagnostic plots provide insights into the assumptions of a regression model. The "Residuals vs Fitted" plot shows a slight curvature, indicating potential non-linearity or model misspecification. The "Normal Q-Q" plot highlights deviations at the tails, suggesting the residuals may not be normally distributed. The "Scale-Location" plot reveals a minor upward trend, which points to heteroscedasticity (non-constant variance of residuals). Finally, the "Residuals vs Leverage" plot identifies a few points near the Cook’s distance line, signaling potential influential observations that may unduly impact the model. These diagnostics suggest the need for model refinement, such as transformations, improved functional form, or addressing influential data points.
+
+#### 3.1.3 Model 3: Using Interaction Terms
+
+We introduce interaction terms between variables to explore the combined effects of variables on the target.
+
+
+```{r}
+# Multiple Linear Regression - Model 3 (including interaction terms)
+model3 <- lm(TARGET_AMT_LOG ~ ., data = insurance_training)
+summary(model3)
+
+
+# Generate diagnostic plots for model_1
+par(mfrow = c(2, 2))  # Display 4 plots in a 2x2 layout
+plot(model2)
+```
+
+This set of diagnostic plots evaluates the residuals of a regression model for key assumptions. The "Residuals vs Fitted" plot reveals a slight curvature, which may indicate non-linearity or a need to adjust the model. The "Normal Q-Q" plot shows deviations at the tails, suggesting that the residuals may not follow a normal distribution. The "Scale-Location" plot indicates a mild upward trend, hinting at heteroscedasticity, where the variance of residuals increases with fitted values. Lastly, the "Residuals vs Leverage" plot identifies some points near the Cook’s distance line, indicating potential influential observations that could unduly affect the model's results. These findings suggest that the model might benefit from refinement, such as transformations, adjustments to the functional form, or addressing influential data points.
+
+
+
+```{r}
+
+set.seed(123)
+# Model Development
+log_model1 <- glm(TARGET_FLAG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, data = insurance_training, family = 'binomial')
+# Summary of the model 
+summary(log_model1)
+# Deviance analyis 
+anova(log_model1, test = 'Chi') # use to ananlyse deviance in all variables 
+
+# Odd Ratio 
+s <- c("AGE" , "CAR_AGE" , "KIDSDRIV_LOG" , "HOMEKIDS_LOG" )
+or_log_model1 <- exp(coef(log_model1)[s])
+print(or_log_model1)
+
+
+step_log_model1 <- step(log_model1, direction = 'backward')
+summary(step_log_model1)
+
+
+exp(coef(log_model1)[s])/(1 + exp(coef(log_model1)[s]))
+
+
+
+# Logit model average means  effects 
+log_model1_scalar  <- mean(dlogis(predict(log_model1, type = 'link')))
+log_model1_scalar * coef(log_model1)
+
+```
+
+
+
+The results of the **Analysis of Deviance Table** provide insight into how each variable contributes to reducing the deviance of the model sequentially, which measures the model's goodness-of-fit. The null model, with no predictors, starts with a residual deviance of **8800.1** on **7644 degrees of freedom (Df)**.
+
+1. **AGE**: Adding this variable reduces the deviance by **78.891**, leaving a residual deviance of **8721.2** with **7643 Df**. This reduction is highly significant (\( p < 2.2 \times 10^{-16} \)), indicating that AGE is a crucial predictor in the model.
+
+2. **CAR_AGE**: Adding CAR_AGE further reduces the deviance by **55.414**, resulting in a residual deviance of **8665.8** with **7642 Df**. This reduction is also highly significant (\( p = 9.764 \times 10^{-14} \)), confirming its importance in explaining variability in TARGET_FLAG.
+
+3. **KIDSDRIV_LOG**: Including KIDSDRIV_LOG decreases the deviance by **58.124**, leaving a residual deviance of **8607.7** on **7641 Df**. This variable is also a significant contributor (\( p = 2.461 \times 10^{-14} \)) to the model.
+
+4. **HOMEKIDS_LOG**: Adding this variable reduces the deviance by **9.918**, resulting in the final residual deviance of **8597.7** with **7640 Df**. Although this reduction is less pronounced compared to the other variables, it is still statistically significant (\( p = 0.001637 \)).
+
+Each variable in the model significantly reduces the deviance, with AGE, CAR_AGE, and KIDSDRIV_LOG making the most substantial contributions. HOMEKIDS_LOG has a smaller but still meaningful impact. The deviance reductions confirm that all these predictors play an important role in explaining the likelihood of TARGET_FLAG (car crashes).
+
+The odds ratios derived from the logistic regression model \( m1 \) provide insights into the relationship between the predictor variables and the likelihood of a car being in a crash (\( TARGET\_FLAG = 1 \)). For the variable `AGE`, the odds ratio of 0.9839 indicates that for each one-year increase in the driver’s age, the odds of being in a crash decrease by approximately 1.6%, suggesting that younger drivers may exhibit riskier behavior compared to older, more experienced drivers. Similarly, for `CAR_AGE`, the odds ratio of 0.9676 implies that for every additional year in the car's age, the odds of a crash decrease by about 3.2%, potentially because older cars may be driven less frequently or more cautiously. In contrast, the variable `KIDSDRIV_LOG` has an odds ratio of 1.6266, indicating that for every unit increase in the log-transformed number of teenage drivers in the household, the odds of a crash increase by approximately 62.7%, reflecting the higher risk associated with teenage drivers due to their inexperience. Lastly, `HOMEKIDS_LOG` shows an odds ratio of 1.2170, meaning that for every unit increase in the log-transformed number of children in the household, the odds of a crash increase by 21.7%, possibly due to the increased driving frequency or busier schedules in larger households. These findings highlight the varying impacts of demographic and vehicle-related factors on crash likelihood.
+
+AGE and CAR_AGE both have a negative relationship with the probability of TARGET_FLAG = 1, meaning as age and car age increase, the likelihood of the target outcome decreases.
+
+KIDSDRIV_LOG and HOMEKIDS_LOG both have positive relationships with the target outcome, meaning that as these variables increase, the likelihood of TARGET_FLAG = 1 increases.
+
+The model's fit is acceptable, but there is room for improvement, as indicated by the residual deviance and AIC.
+
+
+```{r}
+# Apply log transformation to variables in the evaluation dataset
+insurance_evaluation$KIDSDRIV_LOG <- log(insurance_evaluation$KIDSDRIV + 1)
+insurance_evaluation$HOMEKIDS_LOG <- log(insurance_evaluation$HOMEKIDS + 1)
+```
+
+
+
+
+#### 3.2.2 Model 2: Including Interaction Terms
+
+We include interaction terms to explore the effect of variable combinations on the target variable.
+
+
+
+
+```{r}
+# Logistic Regression - Model 3 (including interaction terms + KIDSDRIV_RATIO)
+log_model2 <- glm(TARGET_FLAG ~ AGE * CAR_AGE + KIDSDRIV_RATIO + HOMEKIDS_LOG, 
+                  family = binomial(link = "probit"), data = insurance_training)
+summary(log_model2)
+
+# Odd Ratio 
+s2 <- c("AGE"  , "CAR_AGE" , "KIDSDRIV_RATIO " , "HOMEKIDS_LOG" )
+or_m2 <- exp(coef(log_model2)[s2])
+print(or_m2)
+
+
+step_m2 <- step(log_model2, direction = 'backward')
+summary(step_m2)
+
+
+exp(coef(log_model2)[s2])/(1 + exp(coef(log_model2)[s2]))
+
+# Mean average margibal effect 
+exp(coef(log_model2)[s2])/(1 + exp(coef(log_model2)[s2]))
+m2_probit_scalar <- mean(dnorm(predict(log_model2, type = 'link')))
+m2_probit_scalar * coef(log_model2)
+```
+
+The odds ratios (OR) and average marginal effects (AME) from the logistic regression model provide insights into the relationships between predictors and the outcome. The OR for **AGE (0.9894)** and **CAR_AGE (0.9685)** indicate that as these variables increase, the odds of the outcome decrease slightly, by 1.06% and 3.15% per unit increase, respectively. Conversely, the OR for **HOMEKIDS_LOG (1.1490)** suggests a 14.90% increase in the odds of the outcome for each unit increase in the log-transformed number of kids at home. However, the OR for **KIDSDRIV_RATIO** is missing (NA), potentially due to model issues or estimation problems. The AMEs, scaled by the probit scalar, further quantify these effects in terms of probabilities. For example, a one-unit increase in **AGE** decreases the probability of the outcome by 0.34 percentage points, while a unit increase in **KIDSDRIV_RATIO** increases the probability by 192.76 percentage points, showing its significant impact. Similarly, **HOMEKIDS_LOG** increases the probability by 4.42 percentage points, while the interaction between **AGE** and **CAR_AGE** has a negligible effect. Together, the results highlight the most influential predictors, with **KIDSDRIV_RATIO** having the largest positive effect on the outcome probability.
+
+
+
+#### 3.2.2 Model 2: Including Interaction Terms
+
+We include interaction terms to explore the effect of variable combinations on the target variable.
+
+
+
+The significant predictors in this model are AGE, KIDSDRIV_RATIO, and HOMEKIDS_LOG, indicating they are important in predicting the outcome (TARGET_FLAG).
+
+The model is not greatly improved by the interaction term (AGE:CAR_AGE), suggesting that there is no strong interaction effect between AGE and CAR_AGE.
+
+The CAR_AGE predictor is marginally significant, suggesting a potential relationship, but it is not as strong as the other variables.
+
+#### 3.3.2 Model 3: Including Interaction Terms+ Other
+
+```{r}
+# Logistic Regression - Model 3 (Including Interaction Terms + KIDSDRIV_RATIO)
+log_model3 <- glm(TARGET_FLAG ~ AGE * CAR_AGE + KIDSDRIV_RATIO + HOMEKIDS_LOG, 
+                          family = binomial(link = "logit"), data = insurance_training)
+summary(log_model3)
+
+# Deviance analyis 
+anova(log_model3, test = 'Chi') # use to ananlyse deviance in all variables 
+
+# Odd Ratio 
+s <- c("AGE" , "CAR_AGE" , "KIDSDRIV_RATIO" , "HOMEKIDS_LOG" )
+or_log_model3 <- exp(coef(log_model3)[s])
+print(or_log_model1)
+
+
+step_log_model3 <- step(log_model3, direction = 'backward')
+summary(step_log_model3)
+
+
+exp(coef(log_model3)[s])/(1 + exp(coef(log_model3)[s]))
+
+
+
+# Logit model average means  effects 
+log_model1_scalar  <- mean(dlogis(predict(log_model3, type = 'link')))
+log_model1_scalar * coef(log_model3)
+```
+
+AGE and KIDSDRIV_RATIO are the strongest predictors, with KIDSDRIV_RATIO having a particularly large effect on the outcome.
+
+CAR_AGE has a weaker, marginally significant effect, while HOMEKIDS_LOG also contributes significantly to the model.
+
+The interaction between AGE and CAR_AGE does not significantly improve the model.
+
+
+## 4. SELECT MODELS
+
+In this section, we will evaluate the multiple linear regression and binary logistic regression models using various criteria. The goal is to select the models that provide the best balance between performance and interpretability, while also considering the business context and model simplicity. Here, we will explain the criteria used to select the best models, address potential issues such as multi-collinearity, and discuss the relevant model outputs.
+
+### 4.1 Compare Coefficients:
+
+The key objective for the multiple linear regression model is to find the best model that explains the variability in the target variable (TARGET_AMT_LOG).
+
+Let's extract Coefficients and Standard Errors:
+
+```{r}
+# Model Evaluation for Multiple Linear Regression - Model 1
+# Check for multicollinearity (VIF)
+vif(model_1)  # Variance Inflation Factor (VIF)
+
+# Calculate R-squared, Adjusted R-squared, RMSE, and F-statistic
+summary(model_1)
+
+# Plot residuals
+par(mfrow = c(2, 2))
+plot(model_1)
+
+# RMSE Calculation
+rmse_model1 <- sqrt(mean(model_1$residuals^2))
+
+# Display results
+cat("Adjusted R^2: ", summary(model_1)$adj.r.squared, "\n")
+cat("RMSE: ", rmse_model1, "\n")
+cat("F-statistic: ", summary(model_1)$fstatistic[1], "\n")
+```
+The model appears to have statistically significant predictors (with very low p-values), but the overall fit is poor as indicated by the low R-squared and adjusted R-squared values. This suggests that while individual predictors like age, car age, and home kids may have a significant relationship with the target variable, the model is not explaining much of the variability in the target variable. Further model refinement or additional predictors may be necessary for a better fit.
+
+###  Calculate AIC and Adjusted R²:
+
+
+```{r}
+# Linear Models
+coeff_model1 <- summary(model_1)$coefficients
+coeff_model2 <- summary(model2)$coefficients
+coeff_model3 <- summary(model3)$coefficients
+
+# Logistic Models
+coeff_log_model1 <- summary(log_model1)$coefficients
+coeff_log_model2 <- summary(log_model2)$coefficients
+coeff_log_model3 <- summary(log_model3)$coefficients
+
+# Display coefficients
+print("Linear Model 1 Coefficients:")
+coeff_model1
+
+print("Linear Model 2 Coefficients:")
+coeff_model2
+
+print("Linear Model 3 Coefficients:")
+coeff_model3
+
+print("Logistic Model 1 Coefficients:")
+coeff_log_model1
+
+print("Logistic Model 2 Coefficients:")
+coeff_log_model2
+```
+
+
+```{r}
+# Linear Models
+aic_model1 <- AIC(model_1)
+aic_model2 <- AIC(model2)  # Will be same as model1
+aic_model3 <- AIC(model3)
+
+adjusted_r2_model1 <- summary(model_1)$adj.r.squared
+adjusted_r2_model2 <- summary(model2)$adj.r.squared
+adjusted_r2_model3 <- summary(model3)$adj.r.squared
+
+# Logistic Models
+aic_log_model1 <- AIC(log_model1)
+aic_log_model2 <- AIC(log_model2)
+aic_log_model3 <- AIC(log_model3)
+
+# Display results
+cat("Linear Models AIC and Adjusted R²:\n")
+cat("Model 1: AIC =", aic_model1, "Adjusted R² =", adjusted_r2_model1, "\n")
+cat("Model 2: AIC =", aic_model2, "Adjusted R² =", adjusted_r2_model2, "\n")
+cat("Model 3: AIC =", aic_model3, "Adjusted R² =", adjusted_r2_model3, "\n")
+
+cat("\nLogistic Models AIC:\n")
+cat("Model 1: AIC =", aic_log_model1, "\n")
+cat("Model 2: AIC =", aic_log_model2, "\n")
+cat("Model 3: AIC =", aic_log_model3, "\n")
+```
+
+### Select Models Based on Metrics:
+
+**Linear Regression Models**
+
+- Model 1 and Model 2:
+
+Both models are identical, as reflected by the same coefficients, AIC, and Adjusted R² values.
+AIC: 44178.03
+Adjusted R²: 0.0262
+
+- Model 3:
+Adds interaction terms (AGE:CAR_AGE and KIDSDRIV_LOG:HOMEKIDS_LOG).
+Slightly higher Adjusted R² (0.0264) compared to Models 1 and 2.
+Higher AIC (44178.84), suggesting Model 3 doesn't perform better overall.
+
+- Decision for Linear Models:
+
+Model 1 or Model 2 is preferred due to lower AIC, simpler structure, and comparable Adjusted R².
+
+**Logistic Regression Models**
+
+- Model 1: AIC: 9208.06;
+
+Significant predictors: AGE, CAR_AGE, KIDSDRIV_LOG, HOMEKIDS_LOG (p-values < 0.05).
+
+- Model 2: Adds AGE:CAR_AGE interaction and KIDSDRIV_RATIO. AIC: 9216.27 (higher than Model 1).
+
+Significant predictors: AGE, KIDSDRIV_RATIO, and HOMEKIDS_LOG.
+
+Interaction term AGE:CAR_AGE is not significant (p = 0.549), indicating no meaningful contribution.
+
+Decision for Logistic Models:
+
+Model 1 is preferred due to lower AIC and a more parsimonious structure.
+
+So based on the above metrics and comparison, our final model selection is: Model1 for both linear regression and logistic regression.
+
+Let's generate the ROC Curves for better decision:
+
+
+```{r}
+# Predict probabilities on the training dataset
+insurance_training$probailities_reg1 <- predict(log_model1, newdata = insurance_training, type = "response")
+insurance_training$pred_class_reg1 <- ifelse(insurance_training$probailities_reg1 > 0.5, 1, 0)
+
+# Calculate the ROC curve
+roc_curve <- roc(insurance_training$TARGET_FLAG, insurance_training$probailities_reg1)
+
+# Plot the ROC curve
+plot(roc_curve, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 1",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve)
+```
+
+
+```{r}
+# Predict probabilities on the training dataset
+insurance_training$probailities_reg2 <- predict(log_model2, newdata = insurance_training, type = "response")
+insurance_training$pred_class_reg2 <- ifelse(insurance_training$probailities_reg2 > 0.5, 1, 0)
+
+# Calculate the ROC curve
+roc_curve2 <- roc(insurance_training$TARGET_FLAG, insurance_training$probailities_reg2)
+
+# Plot the ROC curve
+plot(roc_curve2, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 2",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve2)
+```
+
+
+
+```{r}
+# Predict probabilities on the training dataset
+insurance_training$pred_class_reg3 <- predict(log_model3, newdata = insurance_training, type = "response")
+insurance_training$pred_class_reg2 <- ifelse(insurance_training$probailities_reg2 > 0.5, 1, 0)
+# Calculate the ROC curve
+roc_curve3 <- roc(insurance_training$TARGET_FLAG, insurance_training$pred_class_reg3)
+
+# Plot the ROC curve
+plot(roc_curve3, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 3",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve3)
+```
+
