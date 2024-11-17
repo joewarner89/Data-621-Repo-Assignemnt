@@ -465,9 +465,11 @@ The interaction between AGE and CAR_AGE does not significantly improve the model
 
 In this section, we will evaluate the multiple linear regression and binary logistic regression models using various criteria. The goal is to select the models that provide the best balance between performance and interpretability, while also considering the business context and model simplicity. Here, we will explain the criteria used to select the best models, address potential issues such as multi-collinearity, and discuss the relevant model outputs.
 
-### 4.1 Multiple Linear Regression Model
+### 4.1 Compare Coefficients:
 
 The key objective for the multiple linear regression model is to find the best model that explains the variability in the target variable (TARGET_AMT_LOG).
+
+Let's extract Coefficients and Standard Errors:
 
 ```{r}
 # Model Evaluation for Multiple Linear Regression - Model 1
@@ -491,7 +493,7 @@ cat("F-statistic: ", summary(model1)$fstatistic[1], "\n")
 ```
 The model appears to have statistically significant predictors (with very low p-values), but the overall fit is poor as indicated by the low R-squared and adjusted R-squared values. This suggests that while individual predictors like age, car age, and home kids may have a significant relationship with the target variable, the model is not explaining much of the variability in the target variable. Further model refinement or additional predictors may be necessary for a better fit.
 
-### 4.2 4.2 Binary Logistic Regression Model
+###  Calculate AIC and Adjusted R²:
 
 
 ```{r}
@@ -548,6 +550,99 @@ cat("\nLogistic Models AIC:\n")
 cat("Model 1: AIC =", aic_log_model1, "\n")
 cat("Model 2: AIC =", aic_log_model2, "\n")
 cat("Model 3: AIC =", aic_log_model3, "\n")
+```
+
+### Select Models Based on Metrics:
+
+**Linear Regression Models**
+
+- Model 1 and Model 2:
+
+Both models are identical, as reflected by the same coefficients, AIC, and Adjusted R² values.
+AIC: 44178.03
+Adjusted R²: 0.0262
+
+- Model 3:
+Adds interaction terms (AGE:CAR_AGE and KIDSDRIV_LOG:HOMEKIDS_LOG).
+Slightly higher Adjusted R² (0.0264) compared to Models 1 and 2.
+Higher AIC (44178.84), suggesting Model 3 doesn't perform better overall.
+
+- Decision for Linear Models:
+
+Model 1 or Model 2 is preferred due to lower AIC, simpler structure, and comparable Adjusted R².
+
+**Logistic Regression Models**
+
+- Model 1: AIC: 9208.06;
+
+Significant predictors: AGE, CAR_AGE, KIDSDRIV_LOG, HOMEKIDS_LOG (p-values < 0.05).
+
+- Model 2: Adds AGE:CAR_AGE interaction and KIDSDRIV_RATIO. AIC: 9216.27 (higher than Model 1).
+
+Significant predictors: AGE, KIDSDRIV_RATIO, and HOMEKIDS_LOG.
+
+Interaction term AGE:CAR_AGE is not significant (p = 0.549), indicating no meaningful contribution.
+
+Decision for Logistic Models:
+
+Model 1 is preferred due to lower AIC and a more parsimonious structure.
+
+So based on the above metrics and comparison, our final model selection is: Model1 for both linear regression and logistic regression.
+
+Let's generate the ROC Curves for better decision:
+
+```{r}
+# Predict probabilities on the training dataset
+probabilities <- predict(log_model1, newdata = insurance_training, type = "response")
+
+# Calculate the ROC curve
+roc_curve <- roc(insurance_training$TARGET_FLAG, probabilities)
+
+# Plot the ROC curve
+plot(roc_curve, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 1",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve)
+```
+
+```{r}
+# Predict probabilities on the training dataset
+probabilities2 <- predict(log_model2, newdata = insurance_training, type = "response")
+
+# Calculate the ROC curve
+roc_curve2 <- roc(insurance_training$TARGET_FLAG, probabilities2)
+
+# Plot the ROC curve
+plot(roc_curve2, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 1",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve2)
+```
+
+```{r}
+# Predict probabilities on the training dataset
+probabilities3 <- predict(log_model3, newdata = insurance_training, type = "response")
+
+# Calculate the ROC curve
+roc_curve3 <- roc(insurance_training$TARGET_FLAG, probabilities3)
+
+# Plot the ROC curve
+plot(roc_curve3, col = "blue", lwd = 2, 
+     main = "Corrected ROC Curve for Logistic Model 1",
+     xlab = "False Positive Rate", ylab = "True Positive Rate", 
+     xlim = c(0, 1), ylim = c(0, 1))  # Ensure proper axis limits
+abline(a = 0, b = 1, lty = 2, col = "red")  # Add diagonal line
+
+# Display the AUC
+auc(roc_curve3)
 ```
 
 
