@@ -398,6 +398,9 @@ We’ll start by using some of the transformed variables that are more normally 
 log_model1 <- glm(TARGET_FLAG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
                   family = binomial(link = "logit"), data = insurance_training)
 summary(log_model1)
+
+# Check multicollinearity using VIF
+vif(log_model1)
 ```
 
 AGE and CAR_AGE both have a negative relationship with the probability of TARGET_FLAG = 1, meaning as age and car age increase, the likelihood of the target outcome decreases.
@@ -405,6 +408,24 @@ AGE and CAR_AGE both have a negative relationship with the probability of TARGET
 KIDSDRIV_LOG and HOMEKIDS_LOG both have positive relationships with the target outcome, meaning that as these variables increase, the likelihood of TARGET_FLAG = 1 increases.
 
 The model's fit is acceptable, but there is room for improvement, as indicated by the residual deviance and AIC.
+
+```{r}
+# Apply log transformation to variables in the evaluation dataset
+insurance_evaluation$KIDSDRIV_LOG <- log(insurance_evaluation$KIDSDRIV + 1)
+insurance_evaluation$HOMEKIDS_LOG <- log(insurance_evaluation$HOMEKIDS + 1)
+```
+
+**- Evaluating the model:**
+
+```{r}
+# Residual diagnostics
+par(mfrow = c(2, 2))
+plot(log_model1)
+
+# Predict on training and evaluation datasets
+insurance_training$PRED_TARGET_AMT <- exp(predict(log_model1, newdata = insurance_training)) - 1
+insurance_evaluation$PRED_TARGET_AMT <- exp(predict(log_model1, newdata = insurance_evaluation)) - 1
+```
 
 
 #### 3.2.2 Model 2: Including Interaction Terms
@@ -472,67 +493,61 @@ The model appears to have statistically significant predictors (with very low p-
 
 ### 4.2 4.2 Binary Logistic Regression Model
 
-```{r}
-# Apply log transformation to variables in the evaluation dataset
-insurance_evaluation$KIDSDRIV_LOG <- log(insurance_evaluation$KIDSDRIV + 1)
-insurance_evaluation$HOMEKIDS_LOG <- log(insurance_evaluation$HOMEKIDS + 1)
-```
 
 ```{r}
-# Convert TARGET_FLAG to a factor in both datasets
-insurance_training$TARGET_FLAG <- factor(insurance_training$TARGET_FLAG)
-insurance_evaluation$TARGET_FLAG <- factor(insurance_evaluation$TARGET_FLAG)
-```
+# Linear Models
+coeff_model1 <- summary(model1)$coefficients
+coeff_model2 <- summary(model2)$coefficients
+coeff_model3 <- summary(model3)$coefficients
 
+# Logistic Models
+coeff_log_model1 <- summary(log_model1)$coefficients
+coeff_log_model2 <- summary(log_model2)$coefficients
+coeff_log_model3 <- summary(log_model3)$coefficients
 
-```{r}
-# Check levels after conversion
-levels(insurance_training$TARGET_FLAG)
-levels(insurance_evaluation$TARGET_FLAG)
-```
+# Display coefficients
+print("Linear Model 1 Coefficients:")
+coeff_model1
 
+print("Linear Model 2 Coefficients:")
+coeff_model2
 
-```{r}
-# Relevel the TARGET_FLAG in the evaluation dataset to match the training dataset
-insurance_evaluation$TARGET_FLAG <- factor(insurance_evaluation$TARGET_FLAG, levels = levels(insurance_training$TARGET_FLAG))
-```
+print("Linear Model 3 Coefficients:")
+coeff_model3
 
+print("Logistic Model 1 Coefficients:")
+coeff_log_model1
 
-```{r}
-# Logistic Regression Model (for TARGET_FLAG)
-log_model1 <- glm(TARGET_FLAG ~ AGE + CAR_AGE + KIDSDRIV_LOG + HOMEKIDS_LOG, 
-                  family = binomial, data = insurance_training)
-
-# AIC and Log-Likelihood
-log_model1_aic <- AIC(log_model1)
-log_model1_ll <- logLik(log_model1)
-
-# Make predictions
-log_model1_preds <- predict(log_model1, newdata = insurance_evaluation, type = "response")
-log_model1_class <- ifelse(log_model1_preds > 0.5, 1, 0)  # Convert probabilities to binary predictions
-
-# Confusion Matrix
-library(caret)
-conf_matrix <- confusionMatrix(as.factor(log_model1_class), as.factor(insurance_evaluation$TARGET_FLAG))
-
-# Display Metrics
-cat("AIC: ", log_model1_aic, "\n")
-cat("Log-Likelihood: ", log_model1_ll, "\n")
-cat("Accuracy: ", conf_matrix$overall['Accuracy'], "\n")
-cat("Precision: ", conf_matrix$byClass['Pos Pred Value'], "\n")
-cat("Sensitivity: ", conf_matrix$byClass['Sensitivity'], "\n")
-cat("Specificity: ", conf_matrix$byClass['Specificity'], "\n")
-cat("F1 Score: ", conf_matrix$byClass['F1'], "\n")
-
-# ROC Curve and AUC
-roc_curve <- roc(insurance_evaluation$TARGET_FLAG, log_model1_preds)
-cat("AUC: ", auc(roc_curve), "\n")
-plot(roc_curve)
-
+print("Logistic Model 2 Coefficients:")
+coeff_log_model2
 ```
 
 
+```{r}
+# Linear Models
+aic_model1 <- AIC(model1)
+aic_model2 <- AIC(model2)  # Will be same as model1
+aic_model3 <- AIC(model3)
 
+adjusted_r2_model1 <- summary(model1)$adj.r.squared
+adjusted_r2_model2 <- summary(model2)$adj.r.squared
+adjusted_r2_model3 <- summary(model3)$adj.r.squared
 
+# Logistic Models
+aic_log_model1 <- AIC(log_model1)
+aic_log_model2 <- AIC(log_model2)
+aic_log_model3 <- AIC(log_model3)
+
+# Display results
+cat("Linear Models AIC and Adjusted R²:\n")
+cat("Model 1: AIC =", aic_model1, "Adjusted R² =", adjusted_r2_model1, "\n")
+cat("Model 2: AIC =", aic_model2, "Adjusted R² =", adjusted_r2_model2, "\n")
+cat("Model 3: AIC =", aic_model3, "Adjusted R² =", adjusted_r2_model3, "\n")
+
+cat("\nLogistic Models AIC:\n")
+cat("Model 1: AIC =", aic_log_model1, "\n")
+cat("Model 2: AIC =", aic_log_model2, "\n")
+cat("Model 3: AIC =", aic_log_model3, "\n")
+```
 
 
