@@ -3,8 +3,13 @@ title: "DATA 621 HW4 WA"
 author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-11-17"
 output:
-  pdf_document: default
-  html_document: default
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -12,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ## Introduction 
+
 The objective is to build two models using the provided dataset: a multiple linear regression model to predict the cost of a car crash (a continuous variable) and a binary logistic regression model to predict the probability of a car crash (a binary outcome). Only the given variables, or any new variables derived from them, can be used to build these models. The dataset includes a set of variables relevant to the prediction task, which are described in the following section.
 
 ![Project Data](C:\Users\Warner_Beast\OneDrive\Documents\CUNY\DATA 621 - Data Mining\week 12\Screenshot 2024-11-17 122322.png)
@@ -31,6 +37,7 @@ library(VIM)
 ```
 
 ## Data Exploration
+
 The training dataset consists of 8,161 observations and 26 variables. Several categorical variables require transformation to be compatible with both logistic and linear models. We begin with some fundamental transformations.
 
 
