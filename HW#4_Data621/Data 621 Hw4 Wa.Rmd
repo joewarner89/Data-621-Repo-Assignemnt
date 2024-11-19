@@ -1,6 +1,6 @@
 ---
 title: "DATA 621 HW4 WA"
-author: "Warner Alexis"
+author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-11-17"
 output:
   pdf_document: default

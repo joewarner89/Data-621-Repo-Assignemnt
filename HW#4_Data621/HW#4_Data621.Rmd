@@ -1,6 +1,6 @@
 ---
 title: "HW#4_Data621"
-author: "Saloua Daouki"
+author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
 date: "2024-11-15"
 output:
   html_document:
