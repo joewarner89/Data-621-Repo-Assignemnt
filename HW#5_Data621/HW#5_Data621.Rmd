@@ -21,11 +21,60 @@ The goal of this assignment is to build **a count regression model** to predict 
 
 Below is the exploratory analysis of the dataset:
 
-```{r cars}
-summary(cars)
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(corrplot)
+library(readr)
 ```
 
-## Including Plots
+## 1. Data Exploration:
+
+```{r}
+# Load datasets
+training_wine_data <- read_csv("wine-training-data.csv")
+evaluation_wine_data <- read_csv("wine-evaluation-data.csv")
+```
+```{r}
+# Explore dataset
+summary(training_wine_data)
+str(training_wine_data)
+```
+
+```{r}
+# Mean, Median, Standard Deviation
+summary_stats <- training_wine_data %>%
+  summarise(across(where(is.numeric), list(
+    mean = ~ mean(.x, na.rm = TRUE),
+    sd = ~ sd(.x, na.rm = TRUE),
+    median = ~ median(.x, na.rm = TRUE)
+  )))
+```
+
+```{r}
+# Visualizations
+# Boxplot for target variable
+ggplot(training_wine_data, aes(x = "", y = TARGET)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Target Variable", y = "Number of Cases Sold")
+```
+
+```{r}
+# Correlation matrix
+numeric_vars <- training_wine_data %>% select(where(is.numeric))
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+corrplot(cor_matrix, method = "circle")
+```
+
+```{r}
+# Check missing values
+missing_values <- sapply(training_wine_data, function(x) sum(is.na(x)))
+missing_values
+```
+
+
+## 2. Data Preparation:
 
 You can also embed plots, for example:
 
