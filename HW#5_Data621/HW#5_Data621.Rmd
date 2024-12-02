@@ -1,0 +1,36 @@
+---
+title: "HW#5_Data621"
+author: "Saloua Daouki"
+date: "2024-12-01"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This analysis focuses on exploring, analyzing, and modeling a dataset of approximately 12,000 commercially available wines. The dataset primarily includes variables related to the chemical properties of the wines being sold. The target variable represents the number of sample cases of wine purchased by wine distribution companies after sampling a wine. These sample cases are used by distribution companies to provide tasting samples to restaurants and wine stores across the United States. Wines with higher sample case purchases are more likely to be featured in high-end restaurants.
+
+The goal of this assignment is to build **a count regression model** to predict the number of sample cases purchased based on the wine's characteristics. Accurate predictions would enable the wine manufacturer to adjust its wine offerings to maximize sales. Additionally, it's worth considering that missing values in the dataset may hold predictive value for the target variable. For this analysis, only the provided variables (or those derived from them) will be utilized.
+
+Below is the exploratory analysis of the dataset:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
