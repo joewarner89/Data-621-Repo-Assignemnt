@@ -36,11 +36,25 @@ library(readr)
 training_wine_data <- read_csv("wine-training-data.csv")
 evaluation_wine_data <- read_csv("wine-evaluation-data.csv")
 ```
+The evaluation data has 3335 observations with 16 variables. The training data has 12795 observations with also 16 variables.
+
+The message above indicates that the variable 'TARGET' is numerical in the training data where is logical in the evaluation data. This will create an error in later analysis if it is not addressed now; we are going to convert the 'TARGET' to numercial in the evaluation data.
+
+```{r}
+# convert TARGET to numerical in the evaluation data and ensure that it is the same in training data
+evaluation_wine_data$TARGET <- as.numeric(evaluation_wine_data$TARGET)
+training_wine_data$TARGET <- as.numeric(training_wine_data$TARGET)
+```
+
+Next, let's look at the summary statistics and the structure of the training data:
+
 ```{r}
 # Explore dataset
 summary(training_wine_data)
 str(training_wine_data)
 ```
+
+Several variables (such as ResidualSugar, Chlorides, FreeSulfurDioxide, TotalSulfurDioxide, pH, Sulphates, Alcohol, and STARS) in the data contain NA values which could potentially be a concern when we perform model fitting, as some models require imputation or removal of rows with missing data. This we will handle in data preparation section.
 
 ```{r}
 # Mean, Median, Standard Deviation
@@ -50,7 +64,20 @@ summary_stats <- training_wine_data %>%
     sd = ~ sd(.x, na.rm = TRUE),
     median = ~ median(.x, na.rm = TRUE)
   )))
+summary_stats
 ```
+-   The `TARGET` variable -Number of Cases Purchased - has mean and median that are close, indicating a roughly symmetric distribution. The standard deviation shows some variation around the mean.
+
+-   `FixedAcidity` has a large standard deviation compared to its mean and median, suggesting high variability in acidity values across the samples.
+
+-   before building any model, we want to explore how these variables relate to each other and how they influence `TARGET`. In addition, the large spread in `FixedAcidity` could indicate that transformations (e.g., log-transformation) may be helpful to stabilize variance.
+
+
+
+
+
+
+
 
 ```{r}
 # Visualizations
@@ -76,10 +103,67 @@ missing_values
 
 ## 2. Data Preparation:
 
-You can also embed plots, for example:
+
 
 ```{r pressure, echo=FALSE}
-plot(pressure)
+# Fix missing values with median
+training_data <- training_data %>%
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .)))
+
+# Create missing flags
+missing_flags <- training_data %>%
+  summarise(across(everything(), ~ sum(is.na(.))))
+training_data <- training_data %>%
+  mutate(across(everything(), list(flag = ~ as.integer(is.na(.)))))
+
+# Log transform example
+training_data <- training_data %>%
+  mutate(log_target = log1p(target_variable))
+
+# Combine variables (example: interaction term)
+training_data <- training_data %>%
+  mutate(acidity_ratio = fixed_acidity / volatile_acidity)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## 3. Build Models
+
+Build the required models using glm, MASS::glm.nb, and standard linear regression.
+
+```{r}
+# Poisson regression models
+poisson_model1 <- glm(target_variable ~ ., family = poisson(link = "log"), data = training_data)
+poisson_model2 <- glm(target_variable ~ log_target + acidity_ratio, family = poisson(link = "log"), data = training_data)
+
+# Negative Binomial models
+library(MASS)
+nb_model1 <- glm.nb(target_variable ~ ., data = training_data)
+nb_model2 <- glm.nb(target_variable ~ log_target + acidity_ratio, data = training_data)
+
+# Linear regression models
+lm_model1 <- lm(target_variable ~ ., data = training_data)
+lm_model2 <- lm(target_variable ~ log_target + acidity_ratio, data = training_data)
+
+# Compare coefficients
+summary(poisson_model1)
+summary(nb_model1)
+summary(lm_model1)
+```
+
+## 4. Select Models
+
+Choose the best models based on evaluation metrics such as AIC, residual deviance, or adjusted R².
+
+```{r}
+# Model comparison
+models <- list(poisson_model1, poisson_model2, nb_model1, nb_model2, lm_model1, lm_model2)
+model_aic <- sapply(models, AIC)
+
+# Select the best count regression model
+best_model <- nb_model1  # Replace with your choice based on AIC or other metrics
+
+# Evaluate performance
+predictions <- predict(best_model, newdata = evaluation_data, type = "response")
+```
+
