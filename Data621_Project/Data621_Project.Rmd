@@ -50,10 +50,36 @@ This section establishes a solid base for my future exploration, cleaning, and a
 
 ```{r}
 # Path to the Excel file
-file_path1 <- "/Users/salouadaouki/Desktop/Data 621/Data-621-Repo-Assignemnt/Data621_Project/2023 - 2024 SCIENCE BENCHMARK DATA  copy.csv"
+file_path1 <- "2023 - 2024 SCIENCE BENCHMARK DATA  copy.xlsx"
 ```
 
+- **Reading 6th, 7th, and 8th Grade Benchmarks:**
 
+  - `The read_excel()` function is used to load the data for different grade levels and benchmarks. This includes data from three assessments for each grade, allowing us to analyze performance trends over time.
+
+  - The benchmark sheets are labeled accordingly (e.g., "6th Grade Benchmark 1", "7th Grade Benchmark 2"), and the data is read for each grade level separately.
+  
+- **Cleaning 7th Grade Data:**
+
+Here, I am importing the benchmark data for 6th, 7th, and 8th grades from an Excel file, pulling in data for each of the three benchmarks administered over the academic year.
+
+```{r}
+# Load data for each grade and benchmark
+# Reading 6th grade benchmark data
+benchmark_6_11 <- read_excel(file_path1, sheet = "6th Grade Benchmark 1")
+benchmark_6_22 <- read_excel(file_path1, sheet = "6th Grade Benchmark 2")
+benchmark_6_33 <- read_excel(file_path1, sheet = " 6th Grade Benchmark 3")
+
+# Reading 7th grade benchmark data, while removing specific unnecessary (hidden) columns
+benchmark_7_11 <- read_excel(file_path1, sheet = "7th Grade Benchmark 1")
+benchmark_7_22 <- read_excel(file_path1, sheet = "7th Grade Benchmark 2")
+benchmark_7_33 <- read_excel(file_path1, sheet = "7th Grade Benchmark 3")
+
+# Reading 8th grade benchmark data
+benchmark_8_11 <- read_excel(file_path1, sheet = "8th Grade Benchmark 1")
+benchmark_8_22 <- read_excel(file_path1, sheet = "8th Grade Benchmark 2")
+benchmark_8_33 <- read_excel(file_path1, sheet = "8th Grade Benchmark 3")
+```
 
 
 
