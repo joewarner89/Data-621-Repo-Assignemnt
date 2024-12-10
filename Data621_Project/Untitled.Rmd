@@ -1,0 +1,35 @@
+---
+title: "Data621_Project"
+author: "Saloua Daouki"
+date: "2024-12-10"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## # 2023-2024 Science Benchmark Data:
+
+**Research Question:** What are the trends in student performance on science benchmark assessments among 6th, 7th, and 8th graders at a Brooklyn school over the academic year? How can regression modeling help identify and forecast performance patterns, highlighting specific questions or standards that show consistent struggles or growth across three benchmarks, and how accurately can these trends predict future performance?
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

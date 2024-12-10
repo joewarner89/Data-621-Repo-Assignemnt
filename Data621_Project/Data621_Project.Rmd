@@ -1,0 +1,59 @@
+---
+title: "Data621_Project"
+author: "Saloua Daouki"
+date: "2024-12-10"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 4
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## # 2023-2024 Science Benchmark Data:
+
+**Research Question:** What are the trends in student performance on science benchmark assessments among 6th, 7th, and 8th graders at a Brooklyn school over the academic year? How can regression modeling help identify and forecast performance patterns, highlighting specific questions or standards that show consistent struggles or growth across three benchmarks, and how accurately can these trends predict future performance?
+
+## 1. Load necessary libraries:
+
+This part sets the foundation for the analysis, making sure all necessary tools are in place before moving on to data cleaning, exploration, and visualization. Without loading these libraries, the subsequent analysis wouldn’t be possible, so it's a crucial preparatory step.
+
+```{r }
+# Load necessary libraries for data analysis and visualization
+library(readxl)   # For reading Excel files
+library(purrr)
+library(dplyr)    # For data manipulation and transformation
+library(tidyr)    # For tidying data
+library(naniar)   # For visualizing and handling missing values
+library(visdat)   # For creating heatmaps for missing values
+library(ggplot2)  # For data visualization
+library(DT)       # For creating interactive data tables in R
+library(reshape2) 
+library(knitr)
+library(corrplot)  # For correlation plots
+library(stringr)  # Load stringr for string extraction
+library(gt)
+library(plotly) #allow the plots to be zoomed into for better inspection without sacrificing plot quality.
+```
+
+## 2. Explore the data
+
+### 2.1 Load the data
+
+This section establishes a solid base for my future exploration, cleaning, and analysis of student performance trends. I am now prepared to dive deeper into identifying trends and insights across benchmarks.
+
+```{r}
+# Path to the Excel file
+file_path1 <- "/Users/salouadaouki/Desktop/Data 621/Data-621-Repo-Assignemnt/Data621_Project/2023 - 2024 SCIENCE BENCHMARK DATA  copy.csv"
+```
+
+
+
+
+
