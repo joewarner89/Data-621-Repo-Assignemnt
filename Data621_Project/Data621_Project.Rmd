@@ -81,5 +81,302 @@ benchmark_8_22 <- read_excel(file_path1, sheet = "8th Grade Benchmark 2")
 benchmark_8_33 <- read_excel(file_path1, sheet = "8th Grade Benchmark 3")
 ```
 
+### 2.2 Load all data into a list:
+
+This section is about optimizing the way we handle multiple datasets by loading them into a list structure. This approach provides several benefits, especially for simplifying future data manipulation and ensuring consistency.
+
+```{r}
+# Load data from all sheets into a list
+sheet_names1 <- c("6th Grade Benchmark 1", "6th Grade Benchmark 2", " 6th Grade Benchmark 3",
+                 "7th Grade Benchmark 1", "7th Grade Benchmark 2", "7th Grade Benchmark 3",
+                 "8th Grade Benchmark 1", "8th Grade Benchmark 2", "8th Grade Benchmark 3")
+
+# Load data with map to streamline the process
+benchmarks_list1 <- map(sheet_names1, ~ read_excel(file_path1, sheet = .x))
+names(benchmarks_list1) <- sheet_names1
+```
+
+The repeated "New names" in the message above indicates an issue with column naming, similar to the previous section. It might be related to renaming variables or cleaning the column names, which will be done later once all the data is loaded into the list.
+
+### 2.3 Examine the data structure 
+
+The goal here is to quickly inspect the first few rows of each dataset in benchmarks_list to confirm that the data has been loaded correctly and to get an initial sense of the structure.
+
+```{r}
+# Inspect the first few rows of the benchmarks list to ensure data is loaded
+lapply(benchmarks_list1, head)
+```
+
+
+The list structure ($-sign notation) shows that each dataset is being listed by its sheet name (e.g., $6th Grade Benchmark 1, $7th Grade Benchmark 2`, etc.).
+
+The other outputs are the first few rows of each dataset, displaying the varaibles for each.
+
+```{r}
+# Examine the structure of the first benchmark data
+str(benchmarks_list1[[9]])  # Display the structure of the ninth sheet
+```
+
+It appears the `% Correct` row is part of the data and will interfere with further analysis. I'll address this issue in the next section by cleaning each tab to prepare for proper visualization and exploration.
+
+- **Key Observations on Data Structure:**
+
+    - Column Headers: The first column, which should represent question numbers, lacks a clear label. Renaming it to "Questions" will improve clarity.   
+    
+    - Subheadings: The remaining columns, currently labeled "% Correct," need to be renamed to reflect the class numbers (e.g., "600," "817") for accurate analysis and easy reference.
+    
+    - Tidy Data: Ensuring each variable has its own column and each observation its own row, following tidy data principles, will streamline data manipulation and reduce errors during analysis.
+
+### 2.4 Visualize Missing Values:
+
+In this section, we assess data quality by visualizing missing values across the benchmark datasets. Identifying missing data early on helps determine if any imputation or cleaning is necessary to ensure reliable analysis.
+
+```{r}
+# Visualize missing values in each benchmark dataset with titles
+vis_miss(benchmark_6_11) + ggtitle("6th Grade Benchmark 1")
+vis_miss(benchmark_6_22) + ggtitle("6th Grade Benchmark 2")
+vis_miss(benchmark_6_33) + ggtitle("6th Grade Benchmark 3")
+
+vis_miss(benchmark_7_11) + ggtitle("7th Grade Benchmark 1")
+vis_miss(benchmark_7_22) + ggtitle("7th Grade Benchmark 2")
+vis_miss(benchmark_7_33) + ggtitle("7th Grade Benchmark 3")
+
+vis_miss(benchmark_8_11) + ggtitle("8th Grade Benchmark 1")
+vis_miss(benchmark_8_22) + ggtitle("8th Grade Benchmark 2")
+vis_miss(benchmark_8_33) + ggtitle("8th Grade Benchmark 3")
+```
+
+**Findings:**
+
+  - 7th Grade Benchmark 2: One column has 96% missing values, indicating potential issues with data collection or formatting.
+  
+  - 8th Grade Benchmark 3: Twelve columns contain 96% missing values, with 43.5% of the dataset being present and 56.5% missing. This could significantly affect the analysis if not addressed.
+  
+  - Other Datasets: No missing values are detected in the remaining datasets.
+
+### 2.5 Explore Each Tab: 
+
+In this section, we iterate through the first three benchmark datasets (6th Grade Benchmark 1, 6th Grade Benchmark 2, 6th Grade Benchmark 3) and perform the following actions:
+
+- Remove Redundant Rows: The first row, which contains '% Correct,' is removed as it does not represent relevant data.
+
+- Rename Columns: The first column is renamed to "Questions," while the last two columns are renamed "Per_Question_Average" and "Skills" for clarity and consistency.
+
+```{r}
+# Loop through the first three data frames in benchmarks_list to remove the first row and rename columns
+for (i in 1:3) {  # Only iterate through the first three tabs
+  df1 <- benchmarks_list1[[i]]
+  
+  # Remove the first row containing "% Correct"
+  df1 <- df1[-1, ]
+  
+  # Rename the first column
+  colnames(df1)[1] <- "Questions"  
+  
+  # Rename the second-to-last and last columns
+  last_col1 <- ncol(df1)
+  colnames(df1)[last_col1 - 1] <- "Per_Question_Average"  # Second-to-last column
+  colnames(df1)[last_col1] <- "Skills"  # Last column
+  
+  # Update the list with the modified data frame
+  benchmarks_list1[[i]] <- df1
+}
+
+# Check the updated structure of the data frames
+str(benchmarks_list1[[1]])
+```
+
+We did the same process as previous in the second set of benchmark datasets (4th to 6th in the list, corresponding to the 7th Grade Benchmark 1, 7th Grade Benchmark 2, and 7th Grade Benchmark 3).
+
+```{r}
+# Loop through the specified data frames in benchmarks_list to remove the first row if necessary and rename columns
+for (j in 4:6) {  # Only iterate through the second three tabs
+  df1 <- benchmarks_list1[[j]]
+  
+  # Check if the first row contains "% Correct" and only then remove it
+  if (any(grepl("% Correct", df1[1, ], fixed = TRUE))) {
+    df1 <- df1[-1, ]
+  }
+  
+  # Rename columns
+  colnames(df1)[1] <- "Questions"  # Rename the first column
+  
+  # Rename the last column as "Per_Question_Average"
+  last_col1 <- ncol(df1)
+  colnames(df1)[last_col1] <- "Per_Question_Average"
+  
+  # Update the list with the modified data frame
+  benchmarks_list1[[j]] <- df1
+}
+
+# Optional: Check the updated structure of the data frames
+str(benchmarks_list1[[4]])
+```
+
+Again, here we are cleaning and renaming the last three benchmark datasets (8th Grade Benchmark 1, 8th Grade Benchmark 2, and 8th Grade Benchmark 3)
+
+```{r}
+# Loop through the first three data frames in benchmarks_list to remove the first row and rename columns
+for (k in 7:9) {  # Only iterate through the last three tabs
+  df1 <- benchmarks_list1[[k]]
+  
+  # Remove the first row containing "% Correct"
+  df1 <- df1[-1, ]
+  
+  # Rename columns
+  colnames(df1)[1] <- "Questions"           # Rename the first column
+  last_col1 <- ncol(df1)
+  colnames(df1)[last_col1] <- "Per_Question_Average"
+  
+  # Update the list with the modified data frame
+  benchmarks_list1[[k]] <- df1
+}
+
+# Optional: Check the updated structure of the data frames
+str(benchmarks_list1[[7]])
+```
+
+By applying these changes, the datasets now have a cleaner, more uniform structure, making further analysis easier and more accurate.
+
+Next, we implement a crucial step to ensure the integrity of our data before proceeding with further analysis: checking for any empty data frames within our benchmarks_list.
+
+The primary goal is to identify any data frames that may not contain any rows (i.e., are empty). This is an important quality control step, as empty data frames could indicate issues with data loading or data extraction processes. These empty frames would not provide any useful information for our analysis and could lead to errors if not addressed.
+
+```{r}
+# Check if any data frames are empty
+empty_checks1 <- sapply(benchmarks_list1, function(df1) nrow(df1) == 0)
+print(empty_checks1)  # This will show TRUE for any empty data frame
+```
+The printed output above shows that none of the benchmark datasets are empty. it indicates that all datasets contain data and are ready for further analysis.
+
+The next exploration section plays a crucial role in both understanding the datasets and preparing for more detailed analyses. It highlights not only the overall performance trends but also areas where students may need additional support.
+
+```{r}
+# Define a function to explore the dataset
+explore_data1 <- function(df1) {
+  cat("### First Few Rows of the Data ###\n")
+  print(head(df1))
+  
+  cat("\n### Structure of the Data ###\n")
+  print(str(df1))
+  
+  cat("\n### Summary Statistics of the Data ###\n")
+  print(summary(df1))
+  
+  # Check if the column 'Per_Question_Average' exists
+  if ("Per_Question_Average" %in% colnames(df1)) {
+    # Ensure the column is numeric for plotting if necessary
+    df1$Per_Question_Average <- as.numeric(df1$Per_Question_Average)
+
+    # Visualization: Histogram for Per_Question_Average
+    if (!all(is.na(df1$Per_Question_Average))) { # Check if the column has non-NA values
+      cat("\n### Histogram of Per_Question_Average ###\n")
+      print(
+        ggplot(df1, aes(x = Per_Question_Average)) +
+          geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+          labs(title = "Distribution of Per_Question_Average", x = "Per Question Average", y = "Frequency") +
+          theme_minimal()
+      )
+    } else {
+      cat("\nPer_Question_Average has only NA values.\n")
+    }
+
+    # Visualization: Bar Plot for Per_Question_Average by Questions
+    if (!all(is.na(df1$Per_Question_Average))) { # Check if the column has non-NA values
+      cat("\n### Bar Plot of Per_Question_Average by Question ###\n")
+      
+      # Ensure that 'Questions' column is ordered as factors from 1 to 25
+      df1$Questions <- factor(df1$Questions, levels = 1:25)
+
+      print(
+        ggplot(df1, aes(x = Questions, y = Per_Question_Average)) +
+          geom_bar(stat = "identity", fill = "lightgreen", color = "black", na.rm = TRUE) +
+          labs(title = "Per Question Average by Question", x = "Questions", y = "Per Question Average") +
+          theme_minimal() +
+          theme(axis.text.x = element_text(angle = 45, hjust = 1)) # Rotate x-axis labels for readability
+      )
+    } else {
+      cat("\nPer_Question_Average column has only NA values.\n")
+    }
+  } else {
+    cat("\nThe column 'Per_Question_Average' does not exist in this dataset.\n")
+  }
+}
+
+# Apply the function to each benchmark
+for (i in 1:length(benchmarks_list1)) {
+  cat("\n\n### Exploring Benchmark", i, "###\n")
+  explore_data1(benchmarks_list1[[i]])
+}
+```
+
+- The histogram (blue graphs) helps to see the overall spread of average scores across all questions by showing how frequently each score range appears. This the question that is answered by the histogram: **How often do different average scores appear?**
+
+- The bar plot (green plots) provides a direct comparison of individual question scores, helping identify which questions scored higher or lower on average. This is the question that is answered by the bar plot: **What is the average score for each question?**
+
+## 3. Data Cleaning and Preparation
+
+### 3.1 Preparing the data:
+
+In this step, we inspected the dataset to confirm the presence of the necessary columns. The dataset (8th grade as an example) contains the following columns:
+
+```{r}
+# Check if the necessary columns are present before selection
+print(paste("Columns before selection:", paste(colnames(df1), collapse=", ")))
+```
+
+By reviewing this structure, we ensure that all the necessary columns are available for further analysis, which includes comparing performance across different benchmarks and identifying trends in student performance for each question using the `Per_Question_Average`.
+
+Next, a check has been performed for non-numeric entries in the benchmark data frames, and we've found some entries that are not suitable for the analysis.
+
+```{r}
+# Function to check for non-numeric entries
+check_non_numeric1 <- function(df1) {
+  sapply(df1, function(col) {
+    if (is.character(col)) {
+      # Check for unique non-numeric values
+      unique_values1 <- unique(col[!is.na(col) & col != ""])
+      non_numeric_values1 <- unique_values1[!grepl("^[0-9.]+$", unique_values1)]
+      return(non_numeric_values1)
+    } else {
+      return(NULL)
+    }
+  })
+}
+
+# Apply the function to each benchmark data frame
+non_numeric_check1 <- lapply(benchmarks_list1, check_non_numeric1)
+print(non_numeric_check1)
+```
+
+**Findings**
+
+- Common Issues Across All Benchmarks:
+
+    - Questions Column: Contains "Class Average" (for each benchmark).
+
+    - Per_Question_Average Column: Contains "Grade Average" (for each benchmark).
+
+    - Specific Class Columns: Some columns (like 621 in 6th Grade Benchmark 1) contain entries like "Class has 6 students."
+
+- Skills Column: Contains non-numeric values that describe the skills associated with the questions.
+
+To clean up these non-numeric entries, I am going to Convert Per_Question_Average to Numeric in Each Data Frame. This will ensure that the Per_Question_Average column in each benchmark data frame is numeric before combining them.
+
+```{r}
+# Ensure Per_Question_Average is numeric for all data frames
+benchmarks_list1 <- lapply(benchmarks_list1, function(df1) {
+  if ("Per_Question_Average" %in% colnames(df1)) {
+    # Convert non-numeric values to NA, ignoring warnings
+    df1$Per_Question_Average <- suppressWarnings(as.numeric(as.character(df1$Per_Question_Average)))
+  }
+  return(df1)
+})
+
+# Print a sample to check if conversion worked correctly
+print(benchmarks_list1[[1]]$Per_Question_Average)
+```
+
+
 
 
