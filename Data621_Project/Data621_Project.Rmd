@@ -377,6 +377,142 @@ benchmarks_list1 <- lapply(benchmarks_list1, function(df1) {
 print(benchmarks_list1[[1]]$Per_Question_Average)
 ```
 
+### 3.2 Cleaning the Data:
+
+This step aims to clean up the dataset by handling missing values, converting columns to numeric types, and ensuring consistency across different benchmark tabs.
+
+```{r}
+clean_tab1 <- function(data1, sheet_name1) {
+  # Debug: Print the data frame before cleaning
+  cat("Before cleaning:", sheet_name1, "\n")
+  print(head(data1))
+
+  # Replace "???" and empty strings with NA for all character columns
+  data1 <- data1 %>%
+    mutate(across(where(is.character), ~ na_if(na_if(., "???"), "")))
+
+  # Debug: Print the data frame after replacing "???"
+  cat("After replacing '???':", sheet_name1, "\n")
+  print(head(data1))
+
+  # Convert character columns to numeric where applicable, excluding the 'Skills' column
+  data1 <- data1 %>%
+    mutate(across(where(is.character) & !any_of("Skills"), ~ suppressWarnings(as.numeric(.))))
+
+  # Debug: Print the data frame after conversion
+  cat("After conversion:", sheet_name1, "\n")
+  print(head(data1))
+
+  # Round numeric columns to 2 decimal places, excluding the 'Skills' column
+  data1 <- data1 %>%
+    mutate(across(where(is.numeric) & !any_of("Skills"), ~ round(., 2)))
+
+  return(data1)
+}
+
+# Apply the cleaning function to each tab in benchmarks_list
+benchmarks_list1 <- setNames(
+  lapply(names(benchmarks_list1), function(sheet_name1) {
+    clean_tab1(benchmarks_list1[[sheet_name1]], sheet_name1)
+  }), names(benchmarks_list1))
+
+# Display the first few rows of the cleaned 7th Grade Benchmark 1 data
+head(benchmarks_list1[["7th Grade Benchmark 1"]])
+```
+
+**Before Cleaning:** Each debug message labeled "Before cleaning" shows the initial state of the data in each benchmark tab. It allows us to see if there are any anomalies, such as the presence of ??? or inconsistent formats before cleaning.
+
+**After Replacing '???':** Each "After replacing '???'" message shows that any placeholder ??? values have been successfully replaced by NA. This ensures missing data is handled correctly.
+
+**After Conversion:** Each "After conversion" message confirms that character columns have been converted to numeric where applicable, ensuring that you can perform calculations and analysis without errors due to character data types.
+
+### 3.3 Checking the cleaned data:
+
+When combining the data frames, check that the bind_rows function is receiving properly formatted data frames. If the data frames were cleaned to the point where they only contain NA or empty rows, the combined data will also reflect that.
+
+```{r}
+# Before combining, check if any cleaned data frames are empty
+cleaned_checks1 <- lapply(benchmarks_list1, function(df1) nrow(df1) == 0)
+print(cleaned_checks1)  # Should show FALSE for all
+```
+
+**No Empty Data Frames:**
+
+Since every result is FALSE, it means that none of the benchmarks lost all their data during the cleaning process. This is a positive outcome, confirming that the cleaning steps—such as replacing ???, handling missing values, and converting columns to numeric—did not remove so much data that any benchmark tab became completely empty.
+
+### 3.4 Adding categories to the dataset
+
+```{r}
+# Define class types for each grade level
+class_types_6th <- tibble(
+  Class = as.character(c(600:604, 605:608, 609:610, 611:620, 621, 673, 676)),
+  Class_Type = c(
+    rep("IIM", 5),             # Classes 600 to 604
+    rep("ICT", 4),             # Classes 605 to 608
+    rep("Self_contained", 2),  # Classes 609 & 610
+    rep("General", 10),        # Classes 611 to 620
+    "Dual Language",           # Class 621
+    "Self_Contained",          # Class 673
+    "Newcomers"                # Class 676
+  )
+)
+
+class_types_7th <- tibble(
+  Class = as.character(c(700:703, 704, 705:707, 708, 709:710, 711:714, 715, 716, 717:721)),
+  Class_Type = c(
+    rep("Regents", 4),         # Classes 700 to 703
+    "Regents_ICT",             # Class 704
+    rep("ICT", 3),             # Classes 705 to 707
+    "General",                 # Class 708
+    rep("Self_contained", 2),  # Classes 709 & 710
+    rep("General", 4),         # Classes 711 to 714
+    "Virtual_Enterprise",      # Class 715
+    "IIM_Regents",             # Class 716
+    rep("General", 5)          # Classes 717 to 721
+  )
+)
+
+class_types_8th <- tibble(
+  Class = as.character(c(800:803, 804, 805:808, 809:810, 811:814, 815, 816, 817:818)),
+  Class_Type = c(
+    rep("Regents", 4),           # Classes 800 to 803
+    "General",                   # Class 804
+    rep("ICT", 4),               # Classes 805 to 808
+    rep("Self_contained", 2),    # Classes 809 to 810
+    rep("General", 4),           # Classes 811 to 814
+    "Virtual_Enterprise",        # Class 815
+    "IIM",                       # Class 816
+    rep("Other",2)               # Classes 817 & 818
+  )
+)
+
+# Function to pivot long and assign class types based on grade
+process_benchmark <- function(data, class_types) {
+  data %>%
+    pivot_longer(
+      cols = -c(Questions, Per_Question_Average, Skills),   # Only pivot the class columns (leave the rest)
+      names_to = "Class",                                     # Create a column for the class
+      values_to = "Score"                                     # Values go into the "Score" column
+    ) %>%
+    left_join(class_types, by = "Class")                      # Add Class_Type based on the Class
+}
+
+# Apply the function to each grade's benchmarks in the list
+benchmarks_list1[[1]] <- process_benchmark(benchmarks_list1[[1]], class_types_6th)
+benchmarks_list1[[2]] <- process_benchmark(benchmarks_list1[[2]], class_types_6th)
+benchmarks_list1[[3]] <- process_benchmark(benchmarks_list1[[3]], class_types_6th)
+
+benchmarks_list1[[4]] <- process_benchmark(benchmarks_list1[[4]], class_types_7th)
+benchmarks_list1[[5]] <- process_benchmark(benchmarks_list1[[5]], class_types_7th)
+benchmarks_list1[[6]] <- process_benchmark(benchmarks_list1[[6]], class_types_7th)
+
+benchmarks_list1[[7]] <- process_benchmark(benchmarks_list1[[7]], class_types_8th)
+benchmarks_list1[[8]] <- process_benchmark(benchmarks_list1[[8]], class_types_8th)
+benchmarks_list1[[9]] <- process_benchmark(benchmarks_list1[[9]], class_types_8th)
+
+# View an example from the processed list
+print(benchmarks_list1[[1]])
+```
 
 
 
