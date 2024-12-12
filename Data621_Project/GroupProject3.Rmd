@@ -1,0 +1,328 @@
+---
+title: "Untitled"
+author: "Carol Campbell", "Souleymane Doumbia", "Kossi Akplaka", "Saloua Daouki"
+date: "2023-10-21"
+output: html_document
+---
+
+# Loading libraries:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Introduction:
+
+The goal of this project is to find and use data to answer the question "Which are the most valued data science. Our group members are; Carol Campbell, Kossi Akplaka, Souleymane Doumbia and Saloua Daouki.
+
+# Loading data:
+
+```{r }
+url3 <- 'https://raw.githubusercontent.com/Group-Project-Data-607/Project3/main/Data_Science_job.csv'
+skills <- read.csv(file = url3)
+head(skills)
+```
+
+# Tidying the data:
+
+## Data Jobs:
+
+```{r subsetting the data}
+required_skills <- subset(df_skills, select = c('title', 'company_name', 'location', 'Job.posting.location', 'description', 'schedule_type', 'Required.skills'))
+colnames(required_skills)[7] ="skills"
+head(required_skills)
+```
+
+```{r subsetting the data again to pick all data jobs}
+skills_subset <- subset(required_skills, grepl("data", required_skills$title, ignore.case = TRUE))
+```
+
+```{r extracting hard skills from skills column}
+freq_hardskills<- skills_subset %>%
+    mutate(R = grepl("r|ggplot", skills, ignore.case=TRUE)) %>%
+    mutate(python = grepl("Python|pandas|numpy|matplotlib", skills, ignore.case=TRUE)) %>%
+    mutate(SQL = grepl("SQL|postgresql|mysql|nosql", skills, ignore.case=TRUE)) %>%
+    mutate(Microsoft_Suite = grepl("excel|word|power point|spreadsheet", skills, ignore.case=TRUE)) %>%
+    mutate(Azure = grepl("azur", skills, ignore.case=TRUE)) %>%
+    mutate(Power_bi = grepl("power bi|power_bi", skills, ignore.case=TRUE)) %>%
+    mutate(Tableau = grepl("tableau", skills, ignore.case=TRUE)) %>%
+    mutate(Matlab = grepl("matlab", skills, ignore.case=TRUE)) %>%
+    mutate(Java = grepl("java|javascript", skills, ignore.case=TRUE)) %>%
+    mutate(gcp = grepl("gcp", skills, ignore.case=TRUE)) %>%
+    mutate(cplusplus = grepl("c", skills, ignore.case=TRUE)) %>%
+    mutate(Jupyter = grepl("jupyter", skills, ignore.case=TRUE)) %>%
+    mutate(Visio = grepl("visio", skills, ignore.case=TRUE)) %>%
+    mutate(Git = grepl("git", skills, ignore.case=TRUE)) %>%
+    mutate(Machine_learning = grepl("machine learning|hadoop", description, ignore.case=TRUE))%>%
+    mutate(Cloud = grepl("aws|snowflake", description, ignore.case=TRUE))%>%
+    mutate(Other_skills = grepl("spss|sas|ssis|redshift|crystal|looker|airflow|spark|go|linus|unix|rust|alteryx|microstrategy", skills, ignore.case=TRUE)) %>%
+  select(title, R, python, SQL, Microsoft_Suite, Azure, Power_bi, Tableau, Matlab, Java, gcp, cplusplus,Jupyter,Visio, Git, Machine_learning, Cloud, Other_skills)
+freq_hardskills
+```
+
+```{r extracting soft skills from description column}
+freq_softskills<- skills_subset %>%
+    mutate(Communication = grepl("communicat", description, ignore.case=TRUE)) %>%
+    mutate(Collaborative = grepl("collaborat|group|team", description, ignore.case=TRUE)) %>%
+    mutate(TimeManagement = grepl("manage", description, ignore.case=TRUE)) %>%
+    mutate(Leadership = grepl("leader", description, ignore.case=TRUE)) %>%
+    mutate(Remote = grepl("remote", description, ignore.case=TRUE)) %>%
+    mutate(Experienced = grepl("experience", description, ignore.case=TRUE)) %>%
+    mutate(Visualization = grepl("visualization", description, ignore.case=TRUE)) %>%
+    mutate(Problem_solving = grepl("problem solving", description, ignore.case=TRUE)) %>%      
+    mutate(Critical_analysis = grepl("critical", description, ignore.case=TRUE)) %>%
+    mutate(Confidence = grepl("confiden", description, ignore.case=TRUE)) %>%
+  select(title, Communication, Collaborative, TimeManagement, Leadership, Remote, Experienced, Visualization, Problem_solving, Critical_analysis, Confidence)
+freq_softskills
+```
+
+## Data Jobs Analysis:
+
+```{r counting the frequency for every hard skill}
+hardskills <- freq_hardskills %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+hardskills
+```
+
+```{r counting the frequency for every other skill}
+softskills <- freq_softskills %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+softskills
+```
+
+```{r hard skill plot}
+ggplot(hardskills,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="orange") + xlab('') + ylab('Frequency') + labs(title='Data Jobs Hard Skills') + coord_flip()
+```
+
+```{r other skill plot}
+ggplot(softskills,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="blue") + xlab('') + ylab('Frequency') + labs(title='Data Jobs Required Soft Skills') + coord_flip()
+```
+
+## Data Science Jobs
+
+```{r subsetting the data to get data science only}
+skills_subset_science <- subset(required_skills, grepl("data science", required_skills$description, ignore.case = TRUE))
+```
+
+```{r hard skills for data science jobs}
+freq_hardskills_science<- skills_subset_science %>%
+    mutate(R = grepl("r|ggplot", skills, ignore.case=TRUE)) %>%
+    mutate(python = grepl("Python|pandas|numpy|matplotlib", skills, ignore.case=TRUE)) %>%
+    mutate(SQL = grepl("SQL|postgresql|mysql|nosql", skills, ignore.case=TRUE)) %>%
+    mutate(Microsoft_Suite = grepl("excel|word|power point|spreadsheet|outlook|sharepoint|vba", skills, ignore.case=TRUE)) %>%
+    mutate(Azure = grepl("azur", skills, ignore.case=TRUE)) %>%
+    mutate(Power_bi = grepl("power bi|power_bi", skills, ignore.case=TRUE)) %>%
+    mutate(Tableau = grepl("tableau", skills, ignore.case=TRUE)) %>%
+    mutate(Matlab = grepl("matlab", skills, ignore.case=TRUE)) %>%
+    mutate(Java = grepl("java|javascript", skills, ignore.case=TRUE)) %>%
+    mutate(gcp = grepl("gcp", skills, ignore.case=TRUE)) %>%
+    mutate(cplusplus = grepl("c", skills, ignore.case=TRUE)) %>%
+    mutate(Jupyter = grepl("jupyter", skills, ignore.case=TRUE)) %>%
+    mutate(Visio = grepl("visio", skills, ignore.case=TRUE)) %>%
+    mutate(Git = grepl("git", skills, ignore.case=TRUE)) %>%
+    mutate(Machine_learning = grepl("machine learning|hadoop", description, ignore.case=TRUE))%>%
+    mutate(Cloud = grepl("aws|snowflake", description, ignore.case=TRUE))%>%
+    mutate(Other_skills = grepl("spss|sas|ssis|redshift|crystal|looker|airflow|spark|go|linus|unix|rust|alteryx|microstrategy", skills, ignore.case=TRUE)) %>%
+  select(title, R, python, SQL, Microsoft_Suite, Azure, Power_bi, Tableau, Matlab, Java, gcp, cplusplus,Jupyter,Visio, Git, Machine_learning, Cloud, Other_skills)
+freq_hardskills_science
+```
+
+
+```{r soft skills for data science jobs}
+freq_softskills_science<- skills_subset_science %>%
+    mutate(Communication = grepl("communicat", description, ignore.case=TRUE)) %>%
+    mutate(Collaborative = grepl("collaborat|group|team", description, ignore.case=TRUE)) %>%
+    mutate(TimeManagement = grepl("manage", description, ignore.case=TRUE)) %>%
+    mutate(Leadership = grepl("leader", description, ignore.case=TRUE)) %>%
+    mutate(Remote = grepl("remote", description, ignore.case=TRUE)) %>%
+    mutate(Experienced = grepl("experience", description, ignore.case=TRUE)) %>%
+    mutate(Visualization = grepl("visualization", description, ignore.case=TRUE)) %>%
+    mutate(Problem_solving = grepl("problem solving", description, ignore.case=TRUE)) %>%      
+    mutate(Critical_analysis = grepl("critical", description, ignore.case=TRUE)) %>%
+    mutate(Confidence = grepl("confiden", description, ignore.case=TRUE)) %>%
+  select(title, Communication, Collaborative, TimeManagement, Leadership, Remote, Experienced, Visualization, Problem_solving, Critical_analysis, Confidence)
+freq_softskills_science
+```
+
+## Data Science Jobs Analysis:
+
+```{r counting the frequencies of data science jobs }
+hardskills_science <- freq_hardskills_science %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+hardskills_science
+```
+
+```{r plotting the hard skills for data science}
+ggplot(hardskills_science,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="red") + xlab('') + ylab('Frequency') + labs(title='Data Science Required Hard Skills') + coord_flip()
+```
+```{r}
+softskills_science <- freq_softskills_science %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+```
+
+```{r plotting the soft skills for data science}
+ggplot(softskills_science,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="lightblue") + xlab('') + ylab('Frequency') + labs(title='Data Science Required Soft Skills') + coord_flip()
+```
+
+## Data Engineering Jobs
+
+```{r subsetting the data to get data Engineering only}
+skills_subset_engineer <- subset(required_skills, grepl("data engineer", required_skills$description, ignore.case = TRUE))
+```
+
+```{r creating a subset of the dataframe with hard skills}
+freq_hardskills_engineer<- skills_subset_engineer %>%
+    mutate(R = grepl("r|ggplot", skills, ignore.case=TRUE)) %>%
+    mutate(python = grepl("Python|pandas|numpy|matplotlib", skills, ignore.case=TRUE)) %>%
+    mutate(SQL = grepl("SQL|postgresql|mysql|nosql", skills, ignore.case=TRUE)) %>%
+    mutate(Microsoft_Suite = grepl("excel|word|power point|spreadsheet|outlook|sharepoint|vba", skills, ignore.case=TRUE)) %>%
+    mutate(Azure = grepl("azur", skills, ignore.case=TRUE)) %>%
+    mutate(Power_bi = grepl("power bi|power_bi", skills, ignore.case=TRUE)) %>%
+    mutate(Tableau = grepl("tableau", skills, ignore.case=TRUE)) %>%
+    mutate(Matlab = grepl("matlab", skills, ignore.case=TRUE)) %>%
+    mutate(Java = grepl("java|javascript", skills, ignore.case=TRUE)) %>%
+    mutate(gcp = grepl("gcp", skills, ignore.case=TRUE)) %>%
+    mutate(cplusplus = grepl("c", skills, ignore.case=TRUE)) %>%
+    mutate(Jupyter = grepl("jupyter", skills, ignore.case=TRUE)) %>%
+    mutate(Visio = grepl("visio", skills, ignore.case=TRUE)) %>%
+    mutate(Git = grepl("git", skills, ignore.case=TRUE)) %>%
+    mutate(Machine_learning = grepl("machine learning|hadoop", description, ignore.case=TRUE))%>%
+    mutate(Cloud = grepl("aws|snowflake", description, ignore.case=TRUE))%>%
+    mutate(Other_skills = grepl("spss|sas|ssis|redshift|crystal|looker|airflow|spark|go|linus|unix|rust|alteryx|microstrategy", skills, ignore.case=TRUE)) %>%
+  select(title, R, python, SQL, Microsoft_Suite, Azure, Power_bi, Tableau, Matlab, Java, gcp, cplusplus,Jupyter,Visio, Git, Machine_learning, Cloud, Other_skills)
+freq_hardskills_engineer
+```
+
+
+```{r subset of the data to include only soft skills_eng}
+freq_softskills_engineer<- skills_subset_engineer %>%
+    mutate(Communication = grepl("communicat", description, ignore.case=TRUE)) %>%
+    mutate(Collaborative = grepl("collaborat|group|team", description, ignore.case=TRUE)) %>%
+    mutate(TimeManagement = grepl("manage", description, ignore.case=TRUE)) %>%
+    mutate(Leadership = grepl("leader", description, ignore.case=TRUE)) %>%
+    mutate(Remote = grepl("remote", description, ignore.case=TRUE)) %>%
+    mutate(Experienced = grepl("experience", description, ignore.case=TRUE)) %>%
+    mutate(Visualization = grepl("visualization", description, ignore.case=TRUE)) %>%
+    mutate(Problem_solving = grepl("problem solving", description, ignore.case=TRUE)) %>%      
+    mutate(Critical_analysis = grepl("critical", description, ignore.case=TRUE)) %>%
+    mutate(Confidence = grepl("confiden", description, ignore.case=TRUE)) %>%
+  select(title, Communication, Collaborative, TimeManagement, Leadership, Remote, Experienced, Visualization, Problem_solving, Critical_analysis, Confidence)
+freq_softskills_engineer
+```
+
+## Data Engineering Jobs Analysis:
+
+```{r counting the frequencies of hard skills for data engineer jobs }
+hardskills_engineer <- freq_hardskills_engineer %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+hardskills_engineer
+```
+
+```{r plotting the hard skills for data engineer}
+ggplot(hardskills_engineer,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="magenta") + xlab('') + ylab('Frequency') + labs(title='Data Engineering Required Hard Skills') + coord_flip()
+```
+
+```{r counting the frequency of soft skills for data engineer}
+softskills_engineer <- freq_softskills_engineer %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+```
+
+```{r plotting the soft skills for data engineer}
+ggplot(softskills_engineer,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="lightblue") + xlab('') + ylab('Frequency') + labs(title='Data Engineering Required Soft Skills') + coord_flip()
+```
+
+## Data Analyst Jobs
+
+```{r subsetting the data to get data Analyst only}
+skills_subset_analyst <- subset(required_skills, grepl("data analyst", required_skills$description, ignore.case = TRUE))
+```
+
+```{r creating a subset of the dataframe with hard skills for analyst}
+freq_hardskills_analyst<- skills_subset_analyst %>%
+    mutate(R = grepl("r|ggplot", skills, ignore.case=TRUE)) %>%
+    mutate(python = grepl("Python|pandas|numpy|matplotlib", skills, ignore.case=TRUE)) %>%
+    mutate(SQL = grepl("SQL|postgresql|mysql|nosql", skills, ignore.case=TRUE)) %>%
+    mutate(Microsoft_Suite = grepl("excel|word|power point|spreadsheet|outlook|sharepoint|vba", skills, ignore.case=TRUE)) %>%
+    mutate(Azure = grepl("azur", skills, ignore.case=TRUE)) %>%
+    mutate(Power_bi = grepl("power bi|power_bi", skills, ignore.case=TRUE)) %>%
+    mutate(Tableau = grepl("tableau", skills, ignore.case=TRUE)) %>%
+    mutate(Matlab = grepl("matlab", skills, ignore.case=TRUE)) %>%
+    mutate(Java = grepl("java|javascript", skills, ignore.case=TRUE)) %>%
+    mutate(gcp = grepl("gcp", skills, ignore.case=TRUE)) %>%
+    mutate(cplusplus = grepl("c", skills, ignore.case=TRUE)) %>%
+    mutate(Jupyter = grepl("jupyter", skills, ignore.case=TRUE)) %>%
+    mutate(Visio = grepl("visio", skills, ignore.case=TRUE)) %>%
+    mutate(Git = grepl("git", skills, ignore.case=TRUE)) %>%
+    mutate(Machine_learning = grepl("machine learning|hadoop", description, ignore.case=TRUE))%>%
+    mutate(Cloud = grepl("aws|snowflake", description, ignore.case=TRUE))%>%
+    mutate(Other_skills = grepl("spss|sas|ssis|redshift|crystal|looker|airflow|spark|go|linus|unix|rust|alteryx|microstrategy", skills, ignore.case=TRUE)) %>%
+  select(title, R, python, SQL, Microsoft_Suite, Azure, Power_bi, Tableau, Matlab, Java, gcp, cplusplus,Jupyter,Visio, Git, Machine_learning, Cloud, Other_skills)
+freq_hardskills_analyst
+```
+
+
+```{r soft skills data for data analyst}
+freq_softskills_analyst<- skills_subset_analyst %>%
+    mutate(Communication = grepl("communicat", description, ignore.case=TRUE)) %>%
+    mutate(Collaborative = grepl("collaborat|group|team", description, ignore.case=TRUE)) %>%
+    mutate(TimeManagement = grepl("manage", description, ignore.case=TRUE)) %>%
+    mutate(Leadership = grepl("leader", description, ignore.case=TRUE)) %>%
+    mutate(Remote = grepl("remote", description, ignore.case=TRUE)) %>%
+    mutate(Experienced = grepl("experience", description, ignore.case=TRUE)) %>%
+    mutate(Visualization = grepl("visualization", description, ignore.case=TRUE)) %>%
+    mutate(Problem_solving = grepl("problem solving", description, ignore.case=TRUE)) %>%      
+    mutate(Critical_analysis = grepl("critical", description, ignore.case=TRUE)) %>%
+    mutate(Confidence = grepl("confiden", description, ignore.case=TRUE)) %>%
+  select(title, Communication, Collaborative, TimeManagement, Leadership, Remote, Experienced, Visualization, Problem_solving, Critical_analysis, Confidence)
+freq_softskills_analyst
+```
+
+## Data Analyst Jobs Analysis:
+
+```{r counting the frequencies of hard skills for data analyst jobs }
+hardskills_analyst <- freq_hardskills_analyst %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+hardskills_analyst
+```
+
+```{r plotting the hard skills for data analyst}
+ggplot(hardskills_analyst,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="yellow") + xlab('') + ylab('Frequency') + labs(title='Data Analyst Required Hard Skills') + coord_flip()
+```
+
+```{r counting the frequency of soft skills for data analyst}
+softskills_analyst <- freq_softskills_analyst %>%
+  select(-1)%>%
+  summarise_all(sum)%>%
+  gather(skill, freq)%>%
+  arrange(desc(freq))
+```
+
+```{r plotting the soft skills for data analyst}
+ggplot(softskills_analyst,aes(x=reorder(skill, freq), y=freq)) + geom_bar(stat='identity',fill="brown") + xlab('') + ylab('Frequency') + labs(title='Data Analyst Required Soft Skills') + coord_flip()
+```
+
+
+
+# Conclusion:
