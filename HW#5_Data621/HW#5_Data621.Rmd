@@ -104,25 +104,24 @@ missing_values
 ## 2. Data Preparation:
 
 
-
 ```{r pressure, echo=FALSE}
 # Fix missing values with median
-training_data <- training_data %>%
+training_wine_data <- training_wine_data %>%
   mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .)))
 
 # Create missing flags
-missing_flags <- training_data %>%
+missing_flags <- training_wine_data %>%
   summarise(across(everything(), ~ sum(is.na(.))))
-training_data <- training_data %>%
+training_wine_data <- training_wine_data %>%
   mutate(across(everything(), list(flag = ~ as.integer(is.na(.)))))
 
 # Log transform example
-training_data <- training_data %>%
-  mutate(log_target = log1p(target_variable))
+training_wine_data <- training_wine_data %>%
+  mutate(log_target = log1p(TARGET))
 
 # Combine variables (example: interaction term)
-training_data <- training_data %>%
-  mutate(acidity_ratio = fixed_acidity / volatile_acidity)
+training_wine_data <- training_wine_data %>%
+  mutate(acidity_ratio = FixedAcidity / VolatileAcidity)
 
 ```
 
@@ -133,17 +132,17 @@ Build the required models using glm, MASS::glm.nb, and standard linear regressio
 
 ```{r}
 # Poisson regression models
-poisson_model1 <- glm(target_variable ~ ., family = poisson(link = "log"), data = training_data)
-poisson_model2 <- glm(target_variable ~ log_target + acidity_ratio, family = poisson(link = "log"), data = training_data)
+poisson_model1 <- glm(TARGET ~ ., family = poisson(link = "log"), data = training_wine_data)
+poisson_model2 <- glm(TARGET ~ log_target + acidity_ratio, family = poisson(link = "log"), data = training_wine_data)
 
 # Negative Binomial models
 library(MASS)
-nb_model1 <- glm.nb(target_variable ~ ., data = training_data)
-nb_model2 <- glm.nb(target_variable ~ log_target + acidity_ratio, data = training_data)
+nb_model1 <- glm.nb(TARGET ~ ., data = training_wine_data)
+nb_model2 <- glm.nb(TARGET ~ log_target + acidity_ratio, data = training_wine_data)
 
 # Linear regression models
-lm_model1 <- lm(target_variable ~ ., data = training_data)
-lm_model2 <- lm(target_variable ~ log_target + acidity_ratio, data = training_data)
+lm_model1 <- lm(TARGET ~ ., data = training_wine_data)
+lm_model2 <- lm(TARGET ~ log_target + acidity_ratio, data = training_wine_data)
 
 # Compare coefficients
 summary(poisson_model1)
