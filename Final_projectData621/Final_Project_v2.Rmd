@@ -1,0 +1,992 @@
+---
+title: "Final_projectData621"
+author: Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez
+date: "2024-12-17"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+title: "Final_projectData621"
+author: Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez
+date: "2024-12-17"
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+The purpose of this project is to analyze and model factors associated with student depression and academic performance. This involves exploratory data analysis, data cleaning, transformation, and building predictive models to identify key variables impacting both mental health outcomes and CGPA. By examining the relationships between stressors, behaviors, and academic performance, the project provides insights into factors contributing to students' well-being and success.
+
+## Introduction
+Student mental health and academic performance have become critical areas of focus, with increasing academic and financial stress impacting both well-being and educational outcomes. Using a dataset of 27,901 student records, we explore predictors of depression and CGPA, modeling their relationships with key variables such as Academic Pressure, Financial Stress, Sleep Duration, and Work/Study Hours. By employing statistical approaches, we aim to identify the most significant factors influencing student mental health and academic success.
+
+
+## DATA EXPLORATION
+
+### Data Overview
+- **Observations:** 27,901
+- **Variables:** 18
+- **Target Variable:** Depression (Yes/No)
+
+### Structure and Summary Statistics
+```{r}
+# Load libraries
+library(tidyverse)
+library(ggplot2)
+library(DataExplorer)
+library(corrplot)
+library(reshape2)
+
+# Load data without row names
+depr_data <- read.csv("https://raw.githubusercontent.com/joewarner89/Data-621-Repo-Assignemnt/refs/heads/main/Final_projectData621/student%20depression.csv?token=GHSAT0AAAAAAC3QXA36A7MNBS4DVD5DWB2EZ3B6NXQ", row.names = NULL)
+
+# Check for duplicate rows (optional)
+duplicated_rows <- anyDuplicated(depr_data)
+if (duplicated_rows > 0) {
+  depr_data <- depr_data[!duplicated(rownames(depr_data)), ]
+}
+
+# Verify data structure
+str(depr_data)
+
+```
+
+### Missing Values
+```{r}
+# Check for missing values
+plot_missing(depr_data)
+
+# Impute missing values for Financial Stress
+depr_data$Financial.Stress[is.na(depr_data$Financial.Stress)] <- median(depr_data$Financial.Stress, na.rm = TRUE)
+```
+
+### Summary Statistics
+
+```{r}
+# Load necessary libraries
+library(kableExtra)
+library(dplyr)
+library(tidyr)
+library(moments) # For skewness and kurtosis
+
+# Identify numeric variables
+numeric_vars <- names(depr_data)[sapply(depr_data, is.numeric)]
+
+# Exclude the 'id' column from numeric variables
+numeric_vars <- setdiff(numeric_vars, "id")
+
+# Select only numeric columns, excluding 'id'
+numerical_vars <- depr_data %>%
+  dplyr::select(all_of(numeric_vars))
+
+
+# Compute statistical summary including skewness, kurtosis, missing value counts, and percentages
+statistical_summary <- numerical_vars %>%
+  summarise(across(
+    everything(),
+    list(
+      Min = ~round(min(., na.rm = TRUE), 2),
+      Q1 = ~round(quantile(., 0.25, na.rm = TRUE), 2),
+      Mean = ~round(mean(., na.rm = TRUE), 2),
+      Median = ~round(median(., na.rm = TRUE), 2),
+      Q3 = ~round(quantile(., 0.75, na.rm = TRUE), 2),
+      Max = ~round(max(., na.rm = TRUE), 2),
+      Variance = ~round(var(., na.rm = TRUE), 2),
+      CV = ~round(sd(., na.rm = TRUE) / mean(., na.rm = TRUE), 2),
+      Skewness = ~round(skewness(., na.rm = TRUE), 2),
+      Kurtosis = ~round(kurtosis(., na.rm = TRUE), 2),
+      ZeroCount = ~sum(. == 0, na.rm = TRUE),
+      ZeroProportion = ~round(mean(. == 0, na.rm = TRUE) * 100, 2),
+      PercentMissing = ~round(mean(is.na(.)) * 100, 2),
+      Overdispersion = ~round(var(., na.rm = TRUE) / mean(., na.rm = TRUE), 2),
+      Outliers = ~sum(. > (quantile(., 0.75, na.rm = TRUE) + 1.5 * IQR(., na.rm = TRUE)) | 
+                       . < (quantile(., 0.25, na.rm = TRUE) - 1.5 * IQR(., na.rm = TRUE)), na.rm = TRUE)
+    ),
+    .names = "{.col}_{.fn}"
+  )) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Variable", ".value"),
+    names_pattern = "^(.*)_(.*)$"
+  )
+
+# Display the resulting summary table
+kable(statistical_summary, format = "html", caption = "Statistical Summary of Numerical Variables") %>%
+  kable_styling(full_width = TRUE, position = "center", font_size = 12) %>%
+  column_spec(1:ncol(statistical_summary), width = "20%")
+```
+
+The **Statistical Summary of Numerical Variables** reveals key insights into the dataset:
+
+- **Age**: Ranges from 18 to 59 with a mean of 25.82 and low skewness (0.13), indicating a relatively symmetrical distribution. Variance is 24.07, with **12 outliers** detected.  
+- **Academic Pressure**: Ranges between 0 and 5 with a mean of 3.14. The skewness is slightly negative (-0.14), and the coefficient of variation (CV) is 0.44, suggesting moderate dispersion.  
+- **Work Pressure**: Highly skewed (108.59) and overdispersed (4.50), with almost all values at 0 (**Zero Proportion: 99.99%**), indicating minimal variability.  
+- **CGPA**: Exhibits a mean of 7.66 and low skewness (-0.11), with **9 zeros** observed (0.03%). Outliers exist, but overdispersion remains low (0.28).  
+- **Study Satisfaction**: Displays a mean of 2.94 and minimal skewness (0.01), with a variance of 1.85 and **10 zeros** (0.04%).  
+- **Job Satisfaction**: Nearly all values are zero (**99.97% Zero Proportion**) with extremely high skewness (74.10) and overdispersion (2.89), suggesting the variable holds little predictive power.  
+- **Work/Study Hours**: Shows a mean of 7.16 with a moderate coefficient of variation (0.52) and slight negative skewness (-0.45).  
+- **Financial Stress**: Has a mean of 3.14 with minor negative skewness (-0.13) and no missing values. Outliers are not detected.  
+- **Depression**: The target variable, with 41.45% zeros, reflects its binary nature. It shows slight negative skewness (-0.35) and moderate dispersion.  
+
+Overall, variables such as **Work Pressure** and **Job Satisfaction** exhibit extremely high zero proportions and skewness, indicating limited variance. Key predictors like **Academic Pressure**, **Financial Stress**, and **CGPA** show moderate variability and appear well-suited for further analysis.
+
+
+### Data Distribution
+
+Here are the visualizations for the key variables based on their importance and relationships with the target variable **Depression**:
+
+#### Depression Distribution**  
+
+The bar chart shows that a higher proportion of students (over 15,000) report experiencing depression (1) compared to those who do not (0), indicating a significant prevalence of depression in the dataset.
+
+```{r}
+# Distribution of Depression
+ggplot(depr_data, aes(x = factor(Depression))) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Distribution of Depression Status",
+       x = "Depression (0 = No, 1 = Yes)", y = "Count") +
+  theme_minimal()
+```
+
+---
+
+#### Academic Pressure vs. Depression**  
+
+The boxplot shows that students experiencing depression (1) report significantly higher levels of academic pressure, with most values distributed between **3 and 5**. In contrast, students without depression (0) have a lower median academic pressure, with most values ranging between **1 and 3**.
+
+```{r}
+# Boxplot for Academic Pressure by Depression Status
+ggplot(depr_data, aes(x = factor(Depression), y = Academic.Pressure, fill = factor(Depression))) +
+  geom_boxplot() +
+  labs(title = "Academic Pressure by Depression Status",
+       x = "Depression (0 = No, 1 = Yes)", y = "Academic Pressure") +
+  theme_minimal()
+```
+
+---
+
+#### Financial Stress vs. Depression**  
+
+
+The boxplot shows that students experiencing depression (1) report higher levels of financial stress, with most values distributed between **3 and 5**. In contrast, students without depression (0) experience lower financial stress, with most values ranging between **1 and 4**.
+
+```{r}
+# Boxplot for Financial Stress by Depression Status
+ggplot(depr_data, aes(x = factor(Depression), y = Financial.Stress, fill = factor(Depression))) +
+  geom_boxplot() +
+  labs(title = "Financial Stress by Depression Status",
+       x = "Depression (0 = No, 1 = Yes)", y = "Financial Stress") +
+  theme_minimal()
+```
+
+#### CGPA Distribution**  
+
+The histogram shows that the **CGPA** distribution is concentrated between **5 and 10**, with peaks around **6, 7.5, and 9.5**. Very few students have a CGPA near **0**, indicating most students perform within the mid-to-high range academically.
+
+```{r}
+# Histogram for CGPA
+ggplot(depr_data, aes(x = CGPA)) +
+  geom_histogram(fill = "lightgreen", bins = 30, color = "black") +
+  labs(title = "Distribution of CGPA", x = "CGPA", y = "Frequency") +
+  theme_minimal()
+```
+
+#### Sleep Duration by Depression**  
+
+The bar chart shows that students with depression (1) tend to have shorter sleep durations, with the highest counts around **3 hours**. In contrast, students without depression (0) are more evenly distributed across sleep durations, with fewer reporting very short sleep durations.
+
+```{r}
+# Sleep Duration vs. Depression
+ggplot(depr_data, aes(x = Sleep.Duration, fill = factor(Depression))) +
+  geom_bar(position = "dodge") +
+  labs(title = "Sleep Duration by Depression Status",
+       x = "Sleep Duration", y = "Count") +
+  theme_minimal()
+```
+
+#### Work/Study Hours vs. Depression**  
+
+The boxplot shows that students experiencing depression (1) tend to have higher work/study hours, with most values distributed between **8 and 12 hours**, compared to students without depression (0), whose work/study hours are concentrated between **4 and 10 hours**.
+
+```{r}
+# Boxplot for Work/Study Hours
+ggplot(depr_data, aes(x = factor(Depression), y = Work.Study.Hours, fill = factor(Depression))) +
+  geom_boxplot() +
+  labs(title = "Work/Study Hours by Depression Status",
+       x = "Depression (0 = No, 1 = Yes)", y = "Work/Study Hours") +
+  theme_minimal()
+```
+
+#### Correlation Heatmap**  
+
+The correlation heatmap reveals the following key relationships:
+
+- **Depression** shows moderate positive correlations with **Academic Pressure (0.47)** and **Financial Stress (0.36)**, suggesting these are significant predictors of depression.
+- A weaker positive correlation exists between **Depression** and **Work/Study Hours (0.21)**.
+- **Age** has a slight **negative correlation (-0.23)** with Depression, indicating younger students may be more prone to depression.
+- **Work Pressure** and **Job Satisfaction** are highly correlated (**0.77**), suggesting redundancy or multicollinearity between these variables.
+
+Overall, **Academic Pressure** and **Financial Stress** stand out as the strongest predictors of Depression, while other variables show weaker or negligible relationships.
+
+```{r}
+# Correlation plot
+cor_matrix <- cor(numerical_vars, use = "complete.obs")
+corrplot(cor_matrix, method = "number")
+```
+
+## DATA PREPARATION
+
+### Data Cleaning
+
+- Converted categorical variables to numeric.
+- Addressed missing values using median imputation.
+
+#### Outlier Removal
+
+```{r}
+# Function to remove outliers
+remove_outliers <- function(data, cols = NULL) {
+  if (is.null(cols)) {
+    cols <- names(data)[sapply(data, is.numeric)]
+  }
+  for (col in cols) {
+    Q1 <- quantile(data[[col]], 0.25, na.rm = TRUE)
+    Q3 <- quantile(data[[col]], 0.75, na.rm = TRUE)
+    IQR <- Q3 - Q1
+    lower_bound <- Q1 - 1.5 * IQR
+    upper_bound <- Q3 + 1.5 * IQR
+    data <- data[data[[col]] >= lower_bound & data[[col]] <= upper_bound | is.na(data[[col]]), ]
+  }
+  return(data)
+}
+
+# Remove outliers
+cleaned_data <- remove_outliers(depr_data)
+
+str(cleaned_data)
+```
+
+
+
+
+
+
+
+
+
+
+## Data Preprocessing
+
+1. **`depression_data`** → For classification models predicting `Depression` (Logistic Regression, etc.).  
+2. **`cgpa_data`** → For regression models predicting `CGPA` (Linear Regression, Poisson, etc.).  
+3. **`tree_data`** → For tree-based models (like `rpart`, Random Forest) to predict either `Depression` or `CGPA` dynamically, with all features (except IDs).
+
+### Load Libraries**
+
+```{r}
+library(dplyr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+```
+
+### Binary Encoding and Dummy Variables**
+Apply transformations, keeping `fullRank = FALSE` for `tree_data` as trees handle multicollinearity.
+
+```{r}
+# Binary Encoding for Yes/No variables
+cleaned_data <- cleaned_data %>%
+  mutate(across(c(Family.History.of.Mental.Illness, Have.you.ever.had.suicidal.thoughts..),
+                ~ ifelse(. == "Yes", 1, 0)))
+
+# Dummy Encoding (drop one level for depression_data & cgpa_data; full for tree_data)
+dummies <- dummyVars(" ~ .", data = cleaned_data, fullRank = TRUE)
+cleaned_data_encoded <- data.frame(predict(dummies, newdata = cleaned_data))
+
+# Dummy Encoding for tree-based models (retain all levels)
+dummies_tree <- dummyVars(" ~ .", data = cleaned_data, fullRank = FALSE)
+tree_data <- data.frame(predict(dummies_tree, newdata = cleaned_data))
+```
+
+
+### **3. Handle Skewed Variables (Log Transform)**
+Only applied to `depression_data` and `cgpa_data`.
+
+```{r}
+# Log Transform Skewed Variables
+cleaned_data_encoded$Work.Pressure <- log1p(cleaned_data_encoded$Work.Pressure)
+cleaned_data_encoded$Job.Satisfaction <- log1p(cleaned_data_encoded$Job.Satisfaction)
+```
+
+
+### **4. Normalize Continuous Variables**
+Normalize variables for `depression_data` and `cgpa_data` datasets.
+
+```{r}
+# Min-Max Normalization
+normalize <- function(x) {
+  return((x - min(x)) / (max(x) - min(x)))
+}
+
+cleaned_data_encoded <- cleaned_data_encoded %>%
+  mutate(across(c(Age, Academic.Pressure, CGPA, Study.Satisfaction, 
+                  Work.Study.Hours, Financial.Stress), normalize))
+
+```
+
+
+
+### **5. Prepare Final Datasets**
+
+#### **Dataset for Depression Prediction (Classification)**  
+
+Remove `CGPA` and keep `Depression` as the target.
+
+```{r}
+depression_data <- cleaned_data_encoded %>%
+  select(-CGPA)
+
+depression_data$Depression <- as.factor(depression_data$Depression)
+```
+
+#### **Dataset for CGPA Prediction (Regression)**  
+Remove `Depression` and keep `CGPA` as the target.
+
+```{r}
+cgpa_data <- cleaned_data_encoded %>%
+  select(-Depression)
+
+```
+
+#### **Dataset for Tree-Based Models**  
+Retain all variables except `id`.
+
+```{r}
+# Install required packages
+if (!requireNamespace("caret", quietly = TRUE)) {
+  install.packages("caret")
+}
+if (!requireNamespace("ipred", quietly = TRUE)) {
+  install.packages("ipred")
+}
+if (!requireNamespace("randomForest", quietly = TRUE)) {
+  install.packages("randomForest")
+}
+if (!requireNamespace("gbm", quietly = TRUE)) {
+  install.packages("gbm")
+}
+if (!requireNamespace("xgboost", quietly = TRUE)) {
+  install.packages("xgboost")
+}
+# Install and load doParallel
+if (!requireNamespace("doParallel", quietly = TRUE)) {
+  install.packages("doParallel")
+}
+
+library(doParallel)
+# Load libraries
+library(caret)         # For model training and cross-validation
+library(ipred)         # For Bagged Trees
+library(randomForest)  # For Random Forest
+library(gbm)           # For Gradient Boosting Machine
+library(xgboost)       # For Extreme Gradient Boosting
+
+tree_data <- tree_data %>%
+  select(-id)  # Exclude ID column
+
+```
+
+
+### **6. Example Tree Models Using `tree_data`**
+
+#### Predicting Depression:
+
+The **decision tree model for Depression** successfully identifies key predictors and their interactions.
+
+### **Key Insights from the Tree:**
+1. **Top Predictor**:  
+   - `Have.you.ever.had.suicidal.thoughts..` (binary: Yes = 1, No = 0) is the most significant split.  
+     - If `suicidal thoughts = 1`, the likelihood of depression increases.  
+
+2. **Interactions**:  
+   - For students with **no suicidal thoughts** (`= 0`):
+     - **Academic Pressure < 4** further reduces the likelihood of depression.  
+     - **Academic Pressure >= 4** combined with **Financial Stress >= 3** increases the risk.  
+
+   - For students with **suicidal thoughts** (`= 1`):
+     - **Academic Pressure >= 3** increases the likelihood of depression further.  
+     - Financial stress also plays a role.  
+
+3. **Variable Importance**:  
+   - `Have.you.ever.had.suicidal.thoughts..`  
+   - `Academic.Pressure`  
+   - `Financial.Stress`  
+
+### **Interpretation**:
+- **Suicidal Thoughts** is the strongest predictor of depression.  
+- **Academic Pressure** and **Financial Stress** are important interacting variables.  
+- This suggests that reducing academic pressure and financial stress can mitigate depression risk among students.
+
+
+```{r}
+# Decision Tree for Depression
+tree_model_depression <- rpart(Depression ~ ., data = tree_data, method = "class")
+rpart.plot(tree_model_depression, main = "Tree Model for Depression", type = 3, extra = 1)
+
+# Variable Importance
+print(tree_model_depression$variable.importance)
+
+```
+
+## **Final Processed Datasets:**
+
+1. **`depression_data`** → Cleaned, normalized dataset for classification models predicting `Depression`.
+2. **`cgpa_data`** → Cleaned, normalized dataset for regression models predicting `CGPA`.
+3. **`tree_data`** → Fully preprocessed dataset for tree-based models, ready for dynamic target specification.
+
+
+## 3. BUILD MODELS (25 Points)
+
+Here is the updated plan and R code, including a **Logistic Regression** model for **Depression** and expanded models for **CGPA**. 
+
+---
+
+## **Model 1: Predicting Depression** (Classification Problem)
+
+**Target**: `Depression`  
+**Exclusion**: Exclude `Depression` and `CGPA` as predictors.
+
+### Models:
+1. **Logistic Regression**  
+2. **Decision Tree**  
+3. **Random Forest**  
+4. **Gradient Boosting**
+
+---
+
+### **R Code for Depression Models**
+
+#### **1. Logistic Regression**
+
+The **Logistic Regression** model for predicting `Depression` shows strong performance with an **AUC of 0.9225**, indicating excellent discriminatory ability between cases (Depression = 1) and controls (Depression = 0).
+
+### **Key Findings**:
+1. **Significant Predictors**:
+   - `Age` (Negative effect, p < 0.001)
+   - `Academic.Pressure` (Positive effect, p < 0.001)
+   - `Sleep Duration` (`Less than 5 hours` and `More than 8 hours`)
+   - `Dietary Habits` (`Moderate`, `Unhealthy`)
+   - `Work.Study.Hours` (Positive effect, p < 0.001)
+   - `Financial.Stress` (Positive effect, p < 0.001)
+   - `Have.you.ever.had.suicidal.thoughts..` (Strongest predictor, p < 0.001)
+
+2. **Model Fit**:
+   - Residual Deviance: 19,348 on 27,770 degrees of freedom
+   - AIC: 19,564
+
+3. **Confusion Matrix**:
+   - True Negatives: **9173**
+   - False Positives: **2376**
+   - False Negatives: **1814**
+   - True Positives: **14515**
+
+The model highlights that **suicidal thoughts, financial stress, and academic pressure** are the strongest predictors of depression, emphasizing the importance of addressing these factors in interventions.
+
+```{r}
+# Use depression_data to prepare predictors and target
+predictors <- depression_data %>% select(-Depression)  # Exclude target
+
+# Logistic Regression
+logistic_model <- glm(Depression ~ ., data = depression_data, family = binomial)
+
+# Model Summary
+summary(logistic_model)
+
+# Predictions
+predicted_probs <- predict(logistic_model, type = "response")
+predicted_classes <- ifelse(predicted_probs > 0.5, 1, 0)
+
+# Confusion Matrix
+table(Actual = depression_data$Depression, Predicted = predicted_classes)
+
+# AUC-ROC Curve
+library(pROC)
+roc_curve <- roc(depression_data$Depression, predicted_probs)
+plot(roc_curve, col = "blue", main = "ROC Curve for Logistic Regression")
+print(auc(roc_curve))
+
+
+```
+### Remove insignificant variables to improve interpretability by focusing on significant variables while maintaining high predictive accuracy.
+
+The updated logistic regression model, using only significant predictors, achieves an **AUC of 0.9212**, indicating excellent performance. Key predictors include **Academic Pressure**, **Work/Study Hours**, **Financial Stress**, and **Suicidal Thoughts**. The model improves interpretability and reduces complexity while maintaining high accuracy.
+
+```{r}
+# Select significant predictors based on p-values
+significant_vars <- depression_data %>% 
+  select(Depression, Age, Academic.Pressure, Study.Satisfaction, Sleep.DurationLess.than.5.hours, 
+         Sleep.DurationMore.than.8.hours, Dietary.HabitsModerate, Dietary.HabitsUnhealthy,
+         Have.you.ever.had.suicidal.thoughts.., Work.Study.Hours, Financial.Stress, 
+         Family.History.of.Mental.Illness)
+
+# Rebuild Logistic Regression Model
+logistic_model_updated <- glm(Depression ~ ., data = significant_vars, family = binomial)
+
+# Summary of Updated Model
+summary(logistic_model_updated)
+
+# Predictions
+predicted_probs_updated <- predict(logistic_model_updated, type = "response")
+predicted_classes_updated <- ifelse(predicted_probs_updated > 0.5, 1, 0)
+
+# Confusion Matrix
+table(Actual = significant_vars$Depression, Predicted = predicted_classes_updated)
+
+# AUC-ROC Curve
+library(pROC)
+roc_curve_updated <- roc(significant_vars$Depression, predicted_probs_updated)
+plot(roc_curve_updated, col = "blue", main = "ROC Curve for Updated Logistic Regression")
+print(paste("Updated AUC:", auc(roc_curve_updated)))
+
+```
+
+
+#### **2. Decision Tree**
+
+```{r}
+library(rpart)
+library(rpart.plot)
+
+# Decision Tree Model
+tree_model <- rpart(Depression ~ ., data = cbind(predictors, Depression = cleaned_data$Depression), method = "class")
+rpart.plot(tree_model, main = "Decision Tree for Depression")
+```
+
+#### **3. Random Forest**
+
+The **Random Forest model** achieved an **AUC of 0.91** and an **OOB error rate of 16.32%**, with **"Suicidal Thoughts"**, **"Academic Pressure"**, and **"Financial Stress"** as top predictors. Simplification by retaining high-importance variables can improve interpretability without significantly impacting accuracy.
+
+```{r}
+library(randomForest)
+
+# Random Forest Model
+rf_model <- randomForest(factor(Depression) ~ ., data = cbind(predictors, Depression = cleaned_data$Depression), ntree = 100)
+print(rf_model)
+
+# Variable Importance
+importance(rf_model)               # Numerical importance values
+varImpPlot(rf_model, main = "Variable Importance Plot")  # Visualize importance
+
+
+# AUC for Random Forest
+library(pROC)
+
+# Predict probabilities
+predicted_probs_rf <- predict(rf_model, type = "prob")[,2]  # Probability for class 1
+
+# ROC Curve
+roc_curve_rf <- roc(cleaned_data$Depression, predicted_probs_rf)
+plot(roc_curve_rf, col = "blue", main = "ROC Curve for Random Forest")
+print(paste("AUC for Random Forest:", auc(roc_curve_rf)))
+
+```
+
+#### Simplified Random Forest Model vs. Full Model
+
+1. **Key Variables**: The simplified model includes only the top 6 predictors:
+   - Have you ever had suicidal thoughts
+   - Academic Pressure  
+   - Financial Stress  
+   - Age  
+   - Work Study Hours  
+   - Dietary Habits Unhealthy  
+
+2. **Performance**:  
+   - **Simplified Model AUC**: **0.90**  
+   - **Full Model AUC**: **0.91**  
+
+3. **Error Rate**:  
+   - Simplified: **16.23%**  
+   - Full Model: **16.32%**  
+
+**Conclusion:** The simplified model achieves **comparable performance** to the full model with fewer predictors, making it easier to interpret and implement while maintaining accuracy.
+
+```{r}
+library(randomForest)
+library(pROC)
+
+# Select top predictors based on Variable Importance
+top_predictors <- depression_data %>%
+  select(Depression, Have.you.ever.had.suicidal.thoughts.., Academic.Pressure, 
+         Financial.Stress, Work.Study.Hours, Age, Dietary.HabitsUnhealthy)
+
+# Simplified Random Forest Model
+rf_model_simplified <- randomForest(factor(Depression) ~ ., 
+                                    data = top_predictors, ntree = 100)
+print(rf_model_simplified)
+
+# Variable Importance Plot
+varImpPlot(rf_model_simplified, main = "Variable Importance (Simplified Model)")
+
+# ROC Curve for Simplified Model
+predicted_probs_simplified <- predict(rf_model_simplified, type = "prob")[, 2]
+roc_curve_simplified <- roc(top_predictors$Depression, predicted_probs_simplified)
+plot(roc_curve_simplified, col = "blue", main = "ROC Curve for Simplified Random Forest")
+print(paste("Simplified AUC:", auc(roc_curve_simplified)))
+
+```
+
+
+#### **4. Gradient Boosting**
+
+```{r}
+### Boosting (GBM) Model for Classification (No Train-Test Split)
+library(gbm)
+library(doParallel)
+library(caret)
+library(pROC)
+library(ggplot2)
+
+# Set up parallel processing
+cl <- makeCluster(detectCores() - 1)
+registerDoParallel(cl)
+
+set.seed(123)
+
+# Ensure the target is a factor
+tree_data$Depression <- as.factor(tree_data$Depression)
+
+# Prepare predictors (X) and target (y)
+X <- tree_data %>% select(-Depression)  # Exclude target column
+y <- tree_data$Depression
+
+# Rename levels of the target variable
+y <- factor(y, levels = c("0", "1"), labels = c("No", "Yes"))
+
+
+# Train the GBM model using cross-validation
+boost_model <- train(
+  x = X, y = y,
+  method = "gbm",
+  tuneLength = 10,  # Automatically tune over 10 combinations of parameters
+  trControl = trainControl(
+    method = "cv", number = 10,  # 10-fold cross-validation
+    classProbs = TRUE, summaryFunction = twoClassSummary,
+    allowParallel = TRUE
+  ),
+  metric = "ROC",  # Optimize based on AUC
+  verbose = FALSE
+)
+
+# Stop parallel processing
+stopCluster(cl)
+registerDoSEQ()
+
+# Extract optimal parameters
+optimal_params_boost <- boost_model$bestTune
+
+# Compute cross-validation performance
+boost_results <- boost_model$results
+cv_auc <- max(boost_results$ROC)
+
+# Variable Importance
+boost_importance <- summary(boost_model$finalModel)
+
+# Plot Variable Importance
+ggplot(boost_importance, aes(x = reorder(var, rel.inf), y = rel.inf)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(title = "Variable Importance for GBM Model",
+       x = "Variables", y = "Relative Influence") +
+  theme_minimal()
+
+# Display results
+cat("Boosting (GBM) Classification Results:\n")
+cat("Optimal Parameters:\n")
+print(optimal_params_boost)
+cat("Cross-Validation AUC:", cv_auc, "\n")
+
+# Plot RMSE vs Number of Trees (Tuning Results)
+ggplot(boost_results, aes(x = n.trees, y = ROC, color = as.factor(interaction(shrinkage, interaction.depth)))) +
+  geom_line() +
+  geom_point(size = 2) +
+  labs(title = "ROC Profiles for GBM Model",
+       x = "Number of Trees", y = "ROC (Cross-Validation)",
+       color = "Shrinkage/Depth") +
+  theme_minimal()
+
+
+```
+
+## **Model 2: Predicting CGPA** (Regression Problem)
+
+**Target**: `CGPA`  
+**Exclusion**: Exclude `Depression` and `CGPA` as predictors.
+
+### Models:
+1. **Multiple Linear Regression**  
+2. **Poisson Regression**  
+3. **Negative Binomial Regression**  
+4. **Decision Tree**  
+5. **Random Forest**
+
+### **R Code for CGPA Models**
+
+#### **1. Multiple Linear Regression**
+
+```{r}
+# Load libraries
+library(rpart)
+library(rpart.plot)
+
+# Ensure data is ready
+tree_data <- mlr_data  # Your MLR dataset with CGPA as the target
+tree_data$CGPA <- as.numeric(tree_data$CGPA)  # Ensure CGPA is numeric
+
+# Fit a Decision Tree Model
+set.seed(123)
+tree_model <- rpart(
+  CGPA ~ ., 
+  data = tree_data, 
+  method = "anova",    # Use 'anova' for regression trees
+  control = rpart.control(cp = 0.01, minsplit = 20)
+)
+
+# Plot the Tree with Interactions
+rpart.plot(tree_model, 
+           type = 2,            # Show variable names at splits
+           extra = 101,         # Display fitted values at each node
+           main = "Decision Tree Showing Interactions")
+
+# Print Tree Summary
+printcp(tree_model)  # Complexity parameter table
+
+```
+
+
+
+```{r}
+# Prepare predictors
+
+
+# Load Required Libraries
+library(dplyr)
+
+# Select Variables Based on Importance Plot
+mlr_data <- cgpa_data %>%
+  dplyr::select(CGPA, Have.you.ever.had.suicidal.thoughts.., Academic.Pressure, 
+         Financial.Stress, Age, Work.Study.Hours, Dietary.HabitsUnhealthy, 
+         Family.History.of.Mental.Illness, Sleep.DurationLess.than.5.hours, 
+         Sleep.DurationMore.than.8.hours)
+
+# Check Data Structure
+str(mlr_data)
+
+# Build Full MLR Model
+mlr_model <- lm(CGPA ~ ., data = mlr_data)
+
+# Model Summary
+summary(mlr_model)
+
+# Check Assumptions of MLR
+par(mfrow = c(2, 2))  # Arrange plots in 2x2 grid
+plot(mlr_model)       # Diagnostic Plots: Residuals, QQ, Leverage
+
+# Display VIF for Multicollinearity Check
+library(car)
+vif_values <- vif(mlr_model)
+cat("Variance Inflation Factors (VIF):\n")
+print(vif_values)
+
+# AIC and BIC for Model Evaluation
+aic_value <- AIC(mlr_model)
+bic_value <- BIC(mlr_model)
+cat("\nAIC:", aic_value, "\nBIC:", bic_value, "\n")
+
+# Final Output
+cat("\nMLR Model Complete. Check summary for coefficients and diagnostics.\n")
+
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(MASS)
+library(leaps)
+library(car)
+library(MASS)
+
+# Select Variables Based on Importance Plot
+mlr_data <- cgpa_data %>%
+  dplyr::select(CGPA, Have.you.ever.had.suicidal.thoughts.., Academic.Pressure, 
+         Financial.Stress, Age, Work.Study.Hours, Dietary.HabitsUnhealthy, 
+         Family.History.of.Mental.Illness, Sleep.DurationLess.than.5.hours, 
+         Sleep.DurationMore.than.8.hours)
+
+# Function to evaluate models (ensure consistent metrics)
+evaluate_model <- function(model, data) {
+  aic <- tryCatch(AIC(model), error = function(e) NA)
+  bic <- tryCatch(BIC(model), error = function(e) NA)
+  r_squared <- tryCatch(summary(model)$r.squared, error = function(e) NA)
+  return(data.frame(AIC = aic, BIC = bic, R_Squared = r_squared))
+}
+
+# Full Model
+full_model <- lm(CGPA ~ ., data = mlr_data)
+
+# Forward Selection
+forward_model <- step(lm(CGPA ~ 1, data = mlr_data),
+                      scope = formula(full_model),
+                      direction = "forward", trace = FALSE)
+
+# Backward Selection
+backward_model <- step(full_model, 
+                       direction = "backward", trace = FALSE)
+
+# Stepwise Selection
+stepwise_model <- step(lm(CGPA ~ 1, data = mlr_data),
+                       scope = formula(full_model), 
+                       direction = "both", trace = FALSE)
+
+# Recursive Selection
+set.seed(123)
+recursive_selection <- regsubsets(CGPA ~ ., data = mlr_data, nvmax = 10)
+recursive_summary <- summary(recursive_selection)
+best_recursive_model <- which.max(recursive_summary$adjr2)
+recursive_vars <- names(coef(recursive_selection, best_recursive_model))[-1]
+recursive_formula <- as.formula(paste("CGPA ~", paste(recursive_vars, collapse = " + ")))
+recursive_model <- lm(recursive_formula, data = mlr_data)
+
+# Collect Results into a Data Frame
+results <- rbind(
+  data.frame(Model = "Full Model", evaluate_model(full_model, mlr_data)),
+  data.frame(Model = "Forward Selection", evaluate_model(forward_model, mlr_data)),
+  data.frame(Model = "Backward Selection", evaluate_model(backward_model, mlr_data)),
+  data.frame(Model = "Stepwise Selection", evaluate_model(stepwise_model, mlr_data)),
+  data.frame(Model = "Recursive Selection", evaluate_model(recursive_model, mlr_data))
+)
+
+# Print Results
+print(results)
+
+# Determine Best Model Based on AIC
+best_model <- results[which.min(results$AIC), ]
+cat("\nBest Model based on AIC:\n")
+print(best_model)
+
+```
+
+
+#### **2. Poisson Regression**
+```{r}
+# Poisson Regression Model
+poisson_model <- glm(CGPA ~ ., 
+                     data = cbind(predictors_cgpa, CGPA = cgpa_data$CGPA), 
+                     family = poisson)
+
+# Model Summary
+summary(poisson_model)
+
+```
+
+#### **3. Negative Binomial Regression**
+```{r}
+library(MASS)
+
+# Negative Binomial Model
+nb_model <- glm.nb(CGPA ~ ., data = cbind(predictors_cgpa, CGPA = cgpa_data$CGPA))
+summary(nb_model)
+```
+
+#### **4. Decision Tree**
+```{r}
+# Decision Tree for CGPA
+tree_model_cgpa <- rpart(CGPA ~ ., data = cbind(predictors_cgpa, CGPA = cgpa_data$CGPA))
+rpart.plot(tree_model_cgpa, main = "Decision Tree for CGPA")
+```
+
+#### **5. Random Forest**
+```{r}
+library(dplyr)
+
+# Prepare predictors
+predictors_cgpa <- cgpa_data %>% select(-CGPA)
+predictors_cgpa <- predictors_cgpa %>% mutate_if(is.character, as.factor)
+
+# Random Forest for CGPA
+rf_model_cgpa <- randomForest(CGPA ~ ., data = cbind(predictors_cgpa, CGPA = cgpa_data$CGPA), ntree = 100)
+print(rf_model_cgpa)
+
+# Variable Importance Plot
+varImpPlot(rf_model_cgpa, main = "Variable Importance")
+```
+
+---
+
+## **Evaluation**
+
+### **For Depression**:
+1. **Confusion Matrix**: Accuracy, Precision, Recall, F1-Score.
+2. **AUC-ROC Curve**: Measure classification performance.
+
+### **For CGPA**:
+1. **RMSE (Root Mean Squared Error)**  
+2. **R-squared**  
+3. **Residual Analysis**  
+
+---
+
+### **Example RMSE Evaluation for CGPA**:
+```{r}
+library(Metrics)
+
+# Predict using Random Forest
+predicted_cgpa <- predict(rf_model_cgpa)
+rmse_value <- rmse(cleaned_data$CGPA, predicted_cgpa)
+print(paste("RMSE:", rmse_value))
+```
+
+---
+
+## **Summary of Models**
+
+### **Depression (Classification)**
+- Logistic Regression
+- Decision Tree
+- Random Forest
+- Gradient Boosting
+
+### **CGPA (Regression)**
+- Linear Regression
+- Poisson Regression
+- Negative Binomial Regression
+- Decision Tree
+- Random Forest
+
+This comprehensive approach allows for accurate predictions and in-depth evaluation of the significant predictors for both **Depression** and **CGPA**. Let me know if further refinements are needed!
