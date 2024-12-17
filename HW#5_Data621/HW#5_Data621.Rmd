@@ -2,11 +2,17 @@
 title: "HW#5_Data621"
 author: "Saloua Daouki"
 date: "2024-12-01"
-output: 
+output:
+  word_document:
+    toc: true
+    toc_depth: '3'
   html_document:
     toc: true
     toc_float: true
     toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -27,14 +33,18 @@ library(ggplot2)
 library(dplyr)
 library(corrplot)
 library(readr)
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(reshape2)
 ```
 
 ## 1. Data Exploration:
 
 ```{r}
 # Load datasets
-training_wine_data <- read_csv("wine-training-data.csv")
-evaluation_wine_data <- read_csv("wine-evaluation-data.csv")
+training_wine_data <- read.csv('HW 5 attached/wine-training-data.csv')
+evaluation_wine_data <- read.csv("HW 5 attached/wine-evaluation-data.csv")
 ```
 The evaluation data has 3335 observations with 16 variables. The training data has 12795 observations with also 16 variables.
 
@@ -82,10 +92,51 @@ summary_stats
 ```{r}
 # Visualizations
 # Boxplot for target variable
-ggplot(training_wine_data, aes(x = "", y = TARGET)) +
-  geom_boxplot() +
-  labs(title = "Boxplot of Target Variable", y = "Number of Cases Sold")
+data <- training_wine_data
+# Fill missing values with the mean
+#data[is.na(data)] <- lapply(data, function(x) if (is.numeric(x)) mean(x, na.rm = TRUE) else x)
+
+# Replace NA values in numeric columns with their mean
+training_wine_data <- data.frame(lapply(data, function(x) {
+  if (is.numeric(x)) {
+    x[is.na(x)] <- mean(x, na.rm = TRUE)  # Replace NA with mean for numeric columns
+  }
+  return(x)
+}))
+
+
+
+
+# Melt the dataset for faceting
+data_melted <- melt(training_wine_data, id.vars = "TARGET")
+
+# Create faceted density plot
+ggplot(data_melted, aes(x = value, fill = as.factor(TARGET))) +
+  geom_density(alpha = 0.4, color = "blue") +
+  facet_wrap(~variable, scales = "free") +
+  ggtitle("Distribution of All Features by TARGET") +
+  xlab("Value") +
+  ylab("Density") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 8),
+    axis.text.x = element_text(size = 6)
+  )
+
 ```
+The graph is a **faceted density plot** that illustrates the distribution of all numerical features in the dataset relative to the `TARGET` variable. Each subplot corresponds to a specific feature, showing how its values are distributed across different levels of the `TARGET` variable, which is represented by distinct color-coded density curves.
+
+In the `Alcohol` subplot, there is a clear overlap of distributions across `TARGET` categories, though higher `TARGET` levels tend to correspond to higher alcohol content, suggesting a potential correlation. Features like `FixedAcidity`, `VolatileAcidity`, and `CitricAcid` exhibit distributions centered around specific ranges, with variations in density across `TARGET` levels, indicating they could help differentiate certain target categories.
+
+The `ResidualSugar` and `Chlorides` subplots show irregular distributions, with distinct peaks for some `TARGET` levels, suggesting these features might influence the target variable. Similarly, `pH` distributions overlap significantly across categories, showing less variation and potentially lower predictive power. On the other hand, `LabelAppeal` and `STARS` appear to have strong, distinct patterns, as their distributions align clearly with specific `TARGET` values, highlighting them as important predictors. 
+
+Additionally, features like `Density`, `Sulphates`, and `FreeSulfurDioxide` exhibit narrow ranges and sharp peaks, with relatively uniform distributions across most `TARGET` levels, which may indicate limited impact on distinguishing categories. Conversely, `AcidIndex` displays noticeable clustering for certain `TARGET` levels, suggesting its potential as a strong predictor.
+
+Finally, `INDEX`, likely an identifier, shows no meaningful variation with respect to the target variable and is unlikely to contribute to predictive modeling. Overall, the graph provides valuable insights into the relationship between each feature and the target variable, identifying features like `Alcohol`, `LabelAppeal`, `STARS`, and `AcidIndex` as potentially significant for predicting `TARGET`. This analysis can guide further feature selection and model development efforts.
+
+
+
 
 ```{r}
 # Correlation matrix
@@ -104,45 +155,116 @@ missing_values
 ## 2. Data Preparation:
 
 
-```{r pressure, echo=FALSE}
-# Fix missing values with median
-training_wine_data <- training_wine_data %>%
-  mutate(across(where(is.numeric), ~ ifelse(is.na(.), median(., na.rm = TRUE), .)))
 
-# Create missing flags
-missing_flags <- training_wine_data %>%
-  summarise(across(everything(), ~ sum(is.na(.))))
-training_wine_data <- training_wine_data %>%
-  mutate(across(everything(), list(flag = ~ as.integer(is.na(.)))))
 
-# Log transform example
-training_wine_data <- training_wine_data %>%
-  mutate(log_target = log1p(TARGET))
 
-# Combine variables (example: interaction term)
-training_wine_data <- training_wine_data %>%
-  mutate(acidity_ratio = FixedAcidity / VolatileAcidity)
+## Feature selection
 
-```
+We are going to select features that are more important for the 
+modeling development. 
+
 
 
 ## 3. Build Models
 
 Build the required models using glm, MASS::glm.nb, and standard linear regression.
 
-```{r}
-# Poisson regression models
-poisson_model1 <- glm(TARGET ~ ., family = poisson(link = "log"), data = training_wine_data)
-poisson_model2 <- glm(TARGET ~ log_target + acidity_ratio, family = poisson(link = "log"), data = training_wine_data)
 
+
+```{r}
+##Feature selection 
+library(caret)
+# Poisson regression models
+training_data <- training_wine_data
+# Poisson regression models
+poisson_model1 <- glm(TARGET ~ ., family = poisson(link = "log"), data = training_data)
+#poisson_model1 <- glm(TARGET ~ ., family = poisson(link = "log"), data = training_wine_data)
+importance_data <- varImp(poisson_model1,scale=FALSE)
+
+
+
+# Assuming `importance_data` is your data frame
+# Move feature names to rownames and keep the importance values
+# Turn row names into a column named "Features"
+importance_data$Features <- rownames(importance_data)
+rownames(importance_data) <- NULL  # Remove row names
+importance_data$Importance <- importance_data$Overall
+importance_data$Overall <- NULL
+# Reorder columns so "Features" is the first column
+importance_data <- importance_data[, c("Features", "Importance")]
+
+# Print the updated data frame
+print(importance_data)
+
+#rownames(importance_data) <- rownames(importance_data)  # Assign the feature names as rownames
+#colnames(importance_data) <- "Importance"  # Rename the column headers with
+
+
+
+
+# Plot the bar graph
+ggplot(importance_data, aes(x = reorder(Features, -Importance), y = Importance)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  coord_flip() +  # Flip the axes for better readability
+  labs(
+    title = "Feature Importance for Poisson Regression",
+    x = "Features",
+    y = "Importance Score"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(size = 14, face = "bold")
+  )
+
+```
+
+
+From the **feature importance graph** generated using `varImp()`, it is clear that some variables contribute significantly more to the model's predictive performance than others. The top three features—**LabelAppeal**, **STARS**, and **AcidIndex**—stand out with importance scores of approximately 33, 32, and 28, respectively. These features are the most influential predictors and should be prioritized for inclusion in the model. 
+
+In addition to the top three features, **VolatileAcidity**, **TotalSulfurDioxide**, and **FreeSulfurDioxide** demonstrate moderate importance, with scores ranging between 4 and 8. These variables can be included based on the model's performance or if domain knowledge suggests they hold significance. 
+
+On the other hand, features such as **INDEX**, **FixedAcidity**, **ResidualSugar**, and **Density** show very low importance scores, often below 1. These variables have minimal influence on the model's predictions and can be excluded to simplify the model, improve computational efficiency, and potentially reduce overfitting.
+
+In summary, the model should prioritize the top-performing features (**LabelAppeal**, **STARS**, and **AcidIndex**) while selectively including moderate-importance variables like **VolatileAcidity** and **TotalSulfurDioxide**. Low-importance features can be safely removed unless domain-specific knowledge suggests otherwise. To validate this feature selection, the model should be retrained, and its performance metrics (e.g., RMSE, AIC, or accuracy) should be evaluated.
+
+
+```{r}
+poisson_model2 <- glm(TARGET ~ LabelAppeal+
+STARS+AcidIndex+VolatileAcidity+FreeSulfurDioxide+TotalSulfurDioxide , family = poisson(link = "log"), data = training_data)
+summary(poisson_model2)
+library(jtools)
+library(broom)
+library(ggstance)
+
+# plot regression coefficients for poisson.model2 and poisson.model
+plot_summs(poisson_model1, poisson_model2, scale = TRUE, exp = TRUE)
+
+
+
+```
+
+
+The graph compares the **exponentiated coefficients (exp(Estimate))** from two Poisson regression models, **Model 1** (blue circles) and **Model 2** (orange squares), highlighting the predictor effects on the outcome. Features like **LabelAppeal**, **STARS**, and **AcidIndex** have the strongest positive associations, with estimates well above 1.0, showing consistency across both models. In contrast, predictors such as **INDEX**, **FixedAcidity**, **CitricAcid**, and **pH** have estimates near 1.0, indicating minimal impact. Slight differences are observed for variables like **VolatileAcidity** and **TotalSulfurDioxide**, where Model 2 estimates are slightly lower. Overall, the graph demonstrates agreement between the models for key predictors while identifying features with limited or negligible influence.
+
+
+
+
+
+
+
+```{r}
 # Negative Binomial models
 library(MASS)
-nb_model1 <- glm.nb(TARGET ~ ., data = training_wine_data)
-nb_model2 <- glm.nb(TARGET ~ log_target + acidity_ratio, data = training_wine_data)
+nb_model1 <- glm.nb(TARGET~LabelAppeal+STARS+AcidIndex, data = training_data)
+summary(nb_model1)
+### Need to use the data you transform using log . data not found on he 
+#nb_model2 <- glm.nb(target_variable ~ log_target + acidity_ratio, data = training_data)
 
 # Linear regression models
-lm_model1 <- lm(TARGET ~ ., data = training_wine_data)
-lm_model2 <- lm(TARGET ~ log_target + acidity_ratio, data = training_wine_data)
+lm_model1 <- lm(TARGET~LabelAppeal+STARS+AcidIndex, data = training_data)
+#lm_model2 <- lm(target_variable ~ log_target + acidity_ratio, data = training_data)
 
 # Compare coefficients
 summary(poisson_model1)
@@ -150,19 +272,73 @@ summary(nb_model1)
 summary(lm_model1)
 ```
 
+The output is from a **Negative Binomial Regression** model 1, which was fitted to predict the `TARGET` variable using the predictors **LabelAppeal**, **STARS**, and **AcidIndex**. The model employs a **log link function**, and the estimated dispersion parameter (`theta`) is approximately **37,740.79**, indicating the model accounts for overdispersion in the data.
+
+The **coefficients** section provides estimates of the relationship between each predictor and the target variable. The **intercept** has an estimate of **1.5996**, representing the baseline log count when all predictors are zero. For the predictors:
+- **LabelAppeal** has a positive estimate (**0.1996**), meaning that a unit increase in `LabelAppeal` increases the expected count of the target variable, holding other predictors constant.
+- **STARS** has a positive estimate (**0.2155**), indicating a similarly strong positive effect.
+- **AcidIndex** has a negative estimate (**-0.1265**), showing that a unit increase in `AcidIndex` decreases the expected count.
+
+The **z-values** and **p-values** for all predictors are highly significant (p < 0.001), suggesting strong evidence that these variables influence the outcome. The **Null Deviance** (22,860) and **Residual Deviance** (18,677) indicate a significant reduction in deviance, showing the model fits the data well. Finally, the **AIC** (50,630) suggests the model's overall goodness of fit and can be used for comparison with alternative models.
+
 ## 4. Select Models
 
 Choose the best models based on evaluation metrics such as AIC, residual deviance, or adjusted R².
 
 ```{r}
 # Model comparison
-models <- list(poisson_model1, poisson_model2, nb_model1, nb_model2, lm_model1, lm_model2)
-model_aic <- sapply(models, AIC)
+models <- list(poisson_model1, poisson_model2, nb_model1, 
+               #nb_model2, 
+               lm_model1 
+               #lm_model2
+               )
+# Calculate AIC for all models
+aic_model1 <- AIC(poisson_model1)
+aic_model2 <- AIC(poisson_model2)
+aic_model3 <- AIC(nb_model1)
+aic_model4 <- AIC(lm_model1)
+
+# Combine AIC values into a vector
+aic_values <- c(aic_model1, aic_model2, aic_model3, aic_model4)
+names(aic_values) <- c("Model 1", "Model 2", "Model 3", "Model 4")
+
+# BEst Model 
+library(caret)
+
+# Define cross-validation settings
+train_control <- trainControl(method = "cv", number = 5)
+
+# Train models with cross-validation
+set.seed(123)
+model_cv <- train(TARGET~LabelAppeal+STARS+AcidIndex, data = training_data, method = "glm", family = "poisson", 
+                  trControl = train_control)
+
+# Print best model summary
+print(model_cv$finalModel)
 
 # Select the best count regression model
-best_model <- nb_model1  # Replace with your choice based on AIC or other metrics
+best_model <- model_cv$finalModel  # Replace with your choice based on AIC or other metrics
 
 # Evaluate performance
-predictions <- predict(best_model, newdata = evaluation_data, type = "response")
+predictions <- predict(best_model, newdata = evaluation_wine_data, type = "response")
 ```
+
+
+
+
+
+
+### **Comparison and Conclusion**:
+- **Model 1** (Full Poisson Regression) has the **lowest AIC (50,490)** and **lowest residual deviance (18,510)**, indicating the best performance among the models. However, it includes all predictors, which may make it prone to overfitting.
+- **Model 2** (Reduced Poisson Regression) simplifies the model by including only significant predictors, with a minimal increase in AIC (50,530). It strikes a balance between model performance and interpretability.
+- **Model 3** (Negative Binomial Regression) is useful when overdispersion is present, but its AIC (50,630) and residual deviance (18,680) are higher.
+- **Model 4** is inappropriate for count data and can be ruled out.
+
+**Best Model**: **Model 2** is likely the best choice as it simplifies the predictor set while maintaining near-optimal performance. If overdispersion is severe, **Model 3** (Negative Binomial) may be considered, but for simplicity and performance, **Model 2** is preferred.
+
+
+
+Cross-validation is used to evaluate the performance of the **Poisson_model2** and ensure its generalizability to unseen data. In this approach, the dataset is split into **k-folds** (commonly 5 or 10 folds), where the model is trained on **k-1 folds** and validated on the remaining fold, repeating the process for all folds. The average performance metrics, such as the **AIC** (Akaike Information Criterion), **Residual Deviance**, or prediction error, are calculated across all iterations. For **Poisson_model2**, cross-validation helps assess how well the predictors (**LabelAppeal**, **STARS**, and **AcidIndex**) fit the target variable while guarding against overfitting. If the model consistently shows a low AIC and good fit across folds, it confirms the model's reliability and performance on new data.
+
+
 
