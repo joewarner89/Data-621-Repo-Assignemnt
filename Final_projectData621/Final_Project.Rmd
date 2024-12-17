@@ -112,6 +112,6 @@ Based on the output above, the dataset has minimal missing values. Only the Fina
 plot_missing(depr_data)
 ```
 
-
+Since Financial Stress is an ordinal variable (ranging from 1 to 5), we used median imputation the median is a robust measure that minimizes the impact of outliers.
 
 
