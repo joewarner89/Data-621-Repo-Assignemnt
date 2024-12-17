@@ -103,7 +103,9 @@ The dataset consists of different variables that are related to demographic, aca
 # Check for missing values
 colSums(is.na(depr_data))
 ```
+
 Based on the output above, the dataset has minimal missing values. Only the Financial Stress variable contains missing values (3 cases); all other variables have complete data. However, visualizing the missing data can make it easier to identify patterns. Here is a plot showing the missing values:
+
 
 ```{r}
 # Visualize missing data
