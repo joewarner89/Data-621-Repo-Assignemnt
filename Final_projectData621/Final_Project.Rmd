@@ -114,4 +114,17 @@ plot_missing(depr_data)
 
 Since Financial Stress is an ordinal variable (ranging from 1 to 5), we used median imputation the median is a robust measure that minimizes the impact of outliers.
 
+```{r}
+# Impute missing values in Financial Stress with the median
+depr_data$Financial.Stress[is.na(depr_data$Financial.Stress)] <- median(depr_data$Financial.Stress, na.rm = TRUE)
+```
+
+
+```{r}
+# Verify no missing values remain
+sum(is.na(depr_data$Financial.Stress))
+```
+
+Excellent! The 3 missing values have been addressed. Let's move on to further data cleaning and transformation.
+
 
