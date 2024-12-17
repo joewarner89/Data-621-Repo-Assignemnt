@@ -1,8 +1,12 @@
 ---
 title: "Final_projectData621"
-author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
+author: Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota
+  Sanchez
 date: "2024-12-17"
 output:
+  word_document:
+    toc: true
+    toc_depth: '3'
   pdf_document:
     toc: true
     toc_depth: '3'
@@ -24,13 +28,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ### 1.1 Load the necessary libraries:
 
-```{r }
+```{r, warning=FALSE }
 # Load necessary libraries
-library(tidyverse)   # For data wrangling and visualization
+library(tidyverse)
+library(dplyr)# For data wrangling and visualization
 library(ggplot2)     # For plotting
 library(DataExplorer) # For automated EDA
 library(corrplot)    # For correlation matrix
 library(caret)       # For preprocessing and modeling
+library(MASS)
+library(reshape2)
 ```
 
 ### 1.2 Load the data:
@@ -125,20 +132,211 @@ depr_data$Financial.Stress[is.na(depr_data$Financial.Stress)] <- median(depr_dat
 sum(is.na(depr_data$Financial.Stress))
 ```
 
+
+
+The bar charts in the visualizations summarize key insights about the mental health factors affecting students based on the dataset of 27,901 observations.
+
+1. **Academic Pressure**: The distribution of academic pressure shows that the majority of students experience moderate to high academic stress (levels 3 and 5), with fewer reporting lower levels of pressure.
+
+2. **Work Pressure**: Most students report minimal work pressure (0 level), suggesting that academic stress might be a larger contributor to their mental health challenges.
+
+3. **Sleep Duration**: The chart indicates variability in students' sleep patterns, with a significant number sleeping **less than 5 hours** and **5-6 hours**, which may indicate poor sleep habits associated with stress.
+
+4. **Financial Stress**: Financial stress levels are evenly distributed across categories, but a noticeable portion of students report experiencing high financial stress (level 5), which could exacerbate their mental health issues.
+
+5. **Depression Status**: A significant portion of students (approximately 11,000) report having depression, but the majority (over 16,000) do not experience depression. This suggests that while depression is prevalent, there are identifiable stressors (e.g., academic and financial) that can be addressed to mitigate mental health risks.
+
+Overall, the data highlights the impact of academic stress, sleep deprivation, and financial burdens on students' mental health, particularly depression.
+
+
+```{r}
+data <- depr_data
+# Visualization for Academic Pressure
+ggplot(data, aes(x = Academic.Pressure)) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Distribution of Academic Pressure", x = "Pressure Level", y = "Frequency") +
+  theme_minimal()
+
+# Visualization for Work Pressure
+ggplot(data, aes(x = Work.Pressure)) +
+  geom_bar(fill = "lightgreen") +
+  labs(title = "Distribution of Work Pressure", x = "Pressure Level", y = "Frequency") +
+  theme_minimal()
+
+# Visualization for Sleep Duration
+ggplot(data, aes(x = Sleep.Duration)) +
+  geom_bar(fill = "coral") +
+  labs(title = "Distribution of Sleep Duration", x = "Sleep Duration Category", y = "Frequency") +
+  theme_minimal()
+
+# Visualization for Financial Stress
+ggplot(data, aes(x = Financial.Stress)) +
+  geom_bar(fill = "gold") +
+  labs(title = "Distribution of Financial Stress", x = "Stress Level", y = "Frequency") +
+  theme_minimal()
+
+# Visualization for Depression
+ggplot(data, aes(x = Depression)) +
+  geom_bar(fill = "purple") +
+  scale_x_discrete(labels = c("No Depression", "Depression")) +
+  labs(title = "Depression Status", x = "Depression", y = "Frequency") +
+  theme_minimal()
+
+
+
+```
+
+
+
+
+
+
 Excellent! The 3 missing values have been addressed. Let's move on to further data cleaning and transformation.
 
 ```{r}
 # Convert relevant columns to factors
-depr_data$Gender <- as.factor(depr_data$Gender)
-depr_data$City <- as.factor(depr_data$City)
-depr_data$Profession <- as.factor(depr_data$Profession)
-depr_data$Degree <- as.factor(depr_data$Degree)
-depr_data$Sleep.Duration <- as.factor(depr_data$Sleep.Duration)
-depr_data$Dietary.Habits <- as.factor(depr_data$Dietary.Habits)
-depr_data$Family.History.of.Mental.Illness <- as.factor(depr_data$Family.History.of.Mental.Illness)
-depr_data$Have.you.ever.had.suicidal.thoughts.. <- as.factor(depr_data$Have.you.ever.had.suicidal.thoughts..)
-depr_data$Depression <- as.factor(depr_data$Depression)
+# summarization 
+
+# Identify categorical columns
+categorical_cols <- sapply(data, is.character) | sapply(data, is.factor)
+
+# Apply label encoding to all categorical columns
+data[categorical_cols] <- lapply(data[categorical_cols], function(x) as.numeric(as.factor(x)))
+
 ```
+
+
+
+
+
+The graphs provide a detailed analysis of the relationship between various features and the target variable, **"Depression"**. The **P-Values of Features** chart highlights the statistical significance of each feature, with smaller p-values indicating stronger associations. Features such as **"Academic Pressure"**, **"Financial Stress"**, and **"Have you ever had suicidal thoughts?"** are highly significant, as evidenced by their very low p-values, while features like **"ID"**, **"Gender"**, and **"Work Pressure"** show high p-values, indicating minimal significance in predicting depression.
+
+The **Correlations of Features with Depression** chart further reveals the strength and direction of relationships between the features and depression. **"Have you ever had suicidal thoughts?"**, **"Academic Pressure"**, and **"Financial Stress"** exhibit strong positive correlations with depression, suggesting that higher values in these features are associated with an increased likelihood of depression. Conversely, features such as **"Age"** and **"Study Satisfaction"** show negative correlations, indicating that older students and those satisfied with their studies are less likely to experience depression.
+
+The **Correlation Heatmap** visualizes pairwise correlations among all variables, emphasizing the relationships identified earlier. Strong positive correlations are observed between **"Depression"** and features like **"Academic Pressure"**, **"Financial Stress"**, and **"Suicidal Thoughts"**, while weaker or negative correlations are seen for variables like **"Age"**, **"CGPA"**, and **"Study Satisfaction"**. Additionally, the heatmap highlights some multicollinearity among independent variables, which may require further exploration. Overall, the analysis pinpoints the most impactful predictors of depression among students, particularly academic and financial stressors, while highlighting less relevant features such as **"ID"** and **"Gender"**.
+
+
+
+
+```{r}
+# Correlation matrix
+numeric_vars <- data %>% dplyr::select(where(is.numeric))
+
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+corrplot(cor_matrix, method = "number")
+table(cor_matrix)
+
+
+
+
+#####
+# Define the target variable
+target <- "Depression"
+
+# Initialize an empty data frame to store results
+results <- data.frame(Feature = character(), Correlation = numeric(), P_value = numeric(), stringsAsFactors = FALSE)
+
+# Perform univariate analysis
+for (col in names(data)) {
+  if (col != target) {
+    # Calculate correlation and p-value
+    correlation <- cor(data[[col]], data[[target]], use = "complete.obs", method = "pearson")
+    p_value <- cor.test(data[[col]], data[[target]], method = "pearson")$p.value
+    
+    # Append results to the data frame
+    results <- rbind(results, data.frame(Feature = col, Correlation = correlation, P_value = p_value))
+  }
+}
+
+# Sort the results by p-value
+results <- results %>% arrange(P_value)
+
+# Print the results
+print(results)
+
+
+# Create a bar chart for p-values
+ggplot(results, aes(x = reorder(Feature, P_value), y = P_value)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  coord_flip() +
+  labs(title = "P-Values of Features", x = "Features", y = "P-Value") +
+  theme_minimal()
+
+# Create a bar chart for correlations
+ggplot(results, aes(x = reorder(Feature, Correlation), y = Correlation)) +
+  geom_bar(stat = "identity", fill = "lightgreen") +
+  coord_flip() +
+  labs(title = "Correlations of Features with Depression", x = "Features", y = "Correlation") +
+  theme_minimal()
+
+```
+
+
+
+The first graph, which uses boxplots, displays the distribution of all features segmented by the target variable **Depression** (1 and 2), allowing us to observe the spread, variability, and central tendencies. Features like **Academic Pressure** and **Financial Stress** have higher medians for students with depression, while **Sleep Duration** and **Study Satisfaction** show lower medians, indicating inadequate sleep and dissatisfaction with studies as potential contributors to depression. Minimal variation in features such as **ID** and **Work Pressure** suggests they have limited influence on depression outcomes. The second graph, using density plots, provides a smoother visualization of the feature distributions across depression categories, showing distinct peaks for key features like **Academic Pressure**, **Financial Stress**, and **Sleep Duration**, where higher stress and shorter sleep durations align with depression. Features like **"Have you ever had suicidal thoughts?"** exhibit clear separation, strongly correlating with depression. In contrast, **Work Pressure** and **Job Satisfaction** show flat distributions, suggesting limited variability. Both graphs emphasize the critical role of stress-related and behavioral factors, particularly **Academic Pressure**, **Financial Stress**, and **Sleep Duration**, while highlighting **Suicidal Thoughts** as a significant predictor of depression. Features like **ID** and **Work Pressure** remain less informative, reinforcing the importance of stressors and lifestyle factors in understanding depression among students.
+
+
+
+```{r}
+
+# Melt the dataset for faceting
+data_melted <- melt(data, id.vars = "Depression")
+
+# Create faceted density plot
+ggplot(data_melted, aes(x = value, fill = as.factor(Depression))) +
+  geom_density(alpha = 0.4, color = "blue") +
+  facet_wrap(~variable, scales = "free") +
+  ggtitle("Distribution of All Features by TARGET") +
+  xlab("Value") +
+  ylab("Density") +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(size = 8),
+    axis.text.x = element_text(size = 6)
+  )
+
+
+# Checking Outliers 
+```
+
+
+
+
+
+We removed ouliers  in Age , Profession, Work.Presssure, Job.Statisfaction and The longest variables.
+
+
+```{r}
+remove_outliers <- function(data, cols = NULL) {
+  # If no columns are specified, apply to all numeric columns
+  if (is.null(cols)) {
+    cols <- names(data)[sapply(data, is.numeric)]
+  }
+  
+  # Loop through each specified column
+  for (col in cols) {
+    Q1 <- quantile(data[[col]], 0.25, na.rm = TRUE)  # First quartile
+    Q3 <- quantile(data[[col]], 0.75, na.rm = TRUE)  # Third quartile
+    IQR <- Q3 - Q1                                  # Interquartile range
+    lower_bound <- Q1 - 1.5 * IQR                   # Lower threshold
+    upper_bound <- Q3 + 1.5 * IQR                   # Upper threshold
+    
+    # Filter the data to remove outliers
+    data <- data[data[[col]] >= lower_bound & data[[col]] <= upper_bound | is.na(data[[col]]), ]
+  }
+  
+  return(data)
+}
+
+
+cleaned_data <- remove_outliers(data)
+#cols= c('Age','Profession','Work.Pressure','CGPA','Job.Satisfaction','Sleep.Duration','Have.you#.ever.had.suicidal.thoughts..'))
+```
+
+
+
+
 
 
 ```{r}
