@@ -127,4 +127,29 @@ sum(is.na(depr_data$Financial.Stress))
 
 Excellent! The 3 missing values have been addressed. Let's move on to further data cleaning and transformation.
 
+```{r}
+# Convert relevant columns to factors
+depr_data$Gender <- as.factor(depr_data$Gender)
+depr_data$City <- as.factor(depr_data$City)
+depr_data$Profession <- as.factor(depr_data$Profession)
+depr_data$Degree <- as.factor(depr_data$Degree)
+depr_data$Sleep.Duration <- as.factor(depr_data$Sleep.Duration)
+depr_data$Dietary.Habits <- as.factor(depr_data$Dietary.Habits)
+depr_data$Family.History.of.Mental.Illness <- as.factor(depr_data$Family.History.of.Mental.Illness)
+depr_data$Have.you.ever.had.suicidal.thoughts.. <- as.factor(depr_data$Have.you.ever.had.suicidal.thoughts..)
+depr_data$Depression <- as.factor(depr_data$Depression)
+```
+
+
+```{r}
+# Standardize column names (replace spaces and special characters with underscores)
+colnames(depr_data) <- gsub("\\.|\\s+", "_", colnames(depr_data))
+
+# Verify the updated structure
+str(depr_data)
+```
+
+
+
+
 
