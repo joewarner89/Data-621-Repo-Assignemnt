@@ -1,0 +1,51 @@
+---
+title: "Final_projectData621"
+author: "Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez"
+date: "2024-12-17"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract:
+
+## Introduction:
+
+## Exploratory Data Analysis (EDA):
+
+```{r }
+# Load necessary libraries
+library(tidyverse)   # For data wrangling and visualization
+library(ggplot2)     # For plotting
+library(DataExplorer) # For automated EDA
+library(corrplot)    # For correlation matrix
+library(caret)       # For preprocessing and modeling
+```
+
+
+```{r}
+# Read the dataset
+depr_data <- read.csv("student depression.csv")
+
+# View the first few rows
+head(depr_data)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
