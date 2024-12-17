@@ -43,44 +43,6 @@ depr_data <- read.csv("student depression.csv")
 head(depr_data)
 ```
 
-The dataset contains information on students' mental health and related factors, particularly focusing on depression and various stressors. It comprises several demographic, academic, and behavioral variables. These variables include:
-
-- **ID:** Unique identifier for each student.
-
-- **Gender:** The gender of the student (Male/Female).
-
-- **Age:** The age of the student in years.
-
-- **City:** The city where the student resides.
-
-- **Profession:** Indicates the student's role (e.g., Student).
-
-- **Academic Pressure:** Level of academic pressure experienced (numeric).
-
-- **Work Pressure:** Level of work pressure experienced (numeric).
-
-- **CGPA:** Cumulative Grade Point Average, representing academic performance.
-
-- **Study Satisfaction:** Level of satisfaction with study life (numeric).
-
-- **Job Satisfaction:** Level of satisfaction with job (numeric).
-
-- **Sleep Duration:** Average sleep duration (e.g., "5-6 hours").8
-
-- **Dietary Habits:** Quality of diet (e.g., Healthy, Moderate).
-
-- **Degree:** Type of degree the student is pursuing (e.g., B.Pharm, BSc).
-
-- **Suicidal Thoughts:** Indicates whether the student has experienced suicidal thoughts (Yes/No).
-
-- **Work/Study Hours:** Average hours spent on work or study (numeric).
-
-- **Financial Stress:** Level of financial stress experienced (numeric).
-
-- **Family History of Mental Illness:** Indicates if there is a family history of mental illness (Yes/No).
-
-- **Depression:** The target variable indicating whether the student has depression (Yes/No).
-
 
 ### 1.3 Understand the data structure:
 
@@ -90,6 +52,43 @@ The dataset contains information on students' mental health and related factors,
 str(depr_data)
 ```
 
+The dataset consists of 27,901 observations and 18 variables. The dataset contains information on students' mental health and related factors, particularly focusing on depression and various stressors. It comprises several demographic, academic, and behavioral variables. These variables include:
+
+- **ID (int):** Unique identifier for each student.
+
+- **Gender (chr):** The gender of the student (Male/Female).
+
+- **Age (int):** The age of the student in years.
+
+- **City (chr):** The city where the student resides.
+
+- **Profession (chr):** Indicates the student's role (e.g., Student).
+
+- **Academic Pressure (int):** Level of academic pressure experienced (numeric).
+
+- **Work Pressure (int):** Level of work pressure experienced (numeric).
+
+- **CGPA (num):** Cumulative Grade Point Average, representing academic performance.
+
+- **Study Satisfaction (int):** Level of satisfaction with study life (numeric).
+
+- **Job Satisfaction (int):** Level of satisfaction with job (numeric).
+
+- **Sleep Duration (chr):** Average sleep duration (e.g., "5-6 hours").8
+
+- **Dietary Habits (chr):** Quality of diet (e.g., Healthy, Moderate).
+
+- **Degree (chr):** Type of degree the student is pursuing (e.g., B.Pharm, BSc).
+
+- **Suicidal Thoughts (chr):** Indicates whether the student has experienced suicidal thoughts (Yes/No).
+
+- **Work/Study Hours (int):** Average hours spent on work or study (numeric).
+
+- **Financial Stress (int):** Level of financial stress experienced (numeric).
+
+- **Family History of Mental Illness (chr):** Indicates if there is a family history of mental illness (Yes/No).
+
+- **Depression (int):** The target variable indicating whether the student has depression (Yes/No).
 
 ```{r}
 # Summary statistics of the data
