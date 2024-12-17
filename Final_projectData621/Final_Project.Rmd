@@ -20,7 +20,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction:
 
-## Exploratory Data Analysis (EDA):
+## 1. Exploratory Data Analysis (EDA):
+
+### 1.1 Load the necessary libraries:
 
 ```{r }
 # Load necessary libraries
@@ -31,6 +33,7 @@ library(corrplot)    # For correlation matrix
 library(caret)       # For preprocessing and modeling
 ```
 
+### 1.2 Load the data:
 
 ```{r}
 # Read the dataset
@@ -40,12 +43,18 @@ depr_data <- read.csv("student depression.csv")
 head(depr_data)
 ```
 
-## Including Plots
+### 1.3 Understand the data structure:
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+# Basic structure of the data
+str(depr_data)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+# Summary statistics of the data
+summary(depr_data)
+```
+
+
