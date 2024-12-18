@@ -4,16 +4,16 @@ author: Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris M
   Sanchez
 date: "2024-12-17"
 output:
-  word_document:
-    toc: true
-    toc_depth: '3'
-  pdf_document:
-    toc: true
-    toc_depth: '3'
   html_document:
     toc: true
     toc_float: true
     toc_depth: 3
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+  word_document:
+    toc: true
+    toc_depth: '3'
 ---
 
 ```{r setup, include=FALSE}
@@ -348,6 +348,160 @@ str(depr_data)
 ```
 
 
+```{r}
+#Change column names for simplification
+ data <- data %>% rename(Suicidal_Thoughts = Have.you.ever.had.suicidal.thoughts..,
+                 Mental_Illness_History = Family.History.of.Mental.Illness
+                 )
 
+# Divinde the data into train and test
+
+# Split data into training and testing sets
+trainIndex <- createDataPartition(data$Depression, p = 0.7, list = FALSE)
+trainData <- data[trainIndex, ]
+testData <- data[-trainIndex, ]
+
+```
+
+
+##  MODEL DEVELOPMENT
+
+
+
+The analysis of deviance compares the null model, which includes no predictors, to the full model containing all predictors. The **null model deviance** is **26,503.14**, representing the total unexplained variation in the response variable (`Depression`). When predictors are included, the **full model deviance** reduces to **14,578.81**, indicating a significant improvement in model fit. The **deviance difference** is **11,924.33**, with a **degrees of freedom difference of 17**, corresponding to the number of predictors added. This large reduction in deviance highlights the contribution of the predictors in explaining variability. The p-value for the chi-squared test is effectively **0**, confirming that the improvement in model fit is highly significant. Therefore, predictors such as **Academic Pressure**, **Financial Stress**, **Study Satisfaction**, and **Suicidal Thoughts** play a critical role in explaining the probability of depression, as they significantly reduce the unexplained variation in the response variable.
+
+
+
+
+```{r}
+# Ensure the target variable is a factor
+data$Depression <- as.factor(data$Depression)
+
+# Split data into training and testing sets
+trainIndex <- createDataPartition(data$Depression, p = 0.7, list = FALSE)
+trainData <- data[trainIndex, ]
+testData <- data[-trainIndex, ]
+
+# Perform logistic regression
+model <- glm(Depression ~ Age + Gender + Academic.Pressure + Work.Pressure + 
+             Study.Satisfaction + Sleep.Duration + Financial.Stress, 
+             data = trainData, family = binomial)
+
+# Summary of the model
+summary(model)
+
+# Perform ANOVA for Deviance Analysis
+deviance_analysis <- anova(model, test = "Chisq")
+print("Deviance Analysis Table:")
+print(deviance_analysis)
+
+# Deeper Deviance Analysis using Null and Full Model
+null_model <- glm(Depression ~ 1, data = trainData, family = binomial)
+full_model <- glm(Depression ~ ., data = trainData, family = binomial)
+
+deviance_null <- null_model$deviance
+deviance_full <- full_model$deviance
+
+# Deviance Difference and Chi-Square Test
+deviance_diff <- deviance_null - deviance_full
+df_diff <- null_model$df.residual - full_model$df.residual
+p_value <- pchisq(deviance_diff, df = df_diff, lower.tail = FALSE)
+
+cat("\nNull Model Deviance:", deviance_null)
+cat("\nFull Model Deviance:", deviance_full)
+cat("\nDeviance Difference:", deviance_diff)
+cat("\nDegrees of Freedom Difference:", df_diff)
+cat("\nP-Value for Deviance Difference Test:", p_value, "\n")
+
+# Predict probabilities on the test set
+testData$predicted_prob <- predict(model, newdata = testData, type = "response")
+
+# Thresholding to classify predictions
+testData$predicted_class <- ifelse(testData$predicted_prob > 0.5, 1, 0)
+
+# Confusion Matrix
+confusionMatrix(as.factor(testData$predicted_class), testData$Depression)
+
+# Plotting ROC Curve
+library(pROC)
+roc_curve <- roc(testData$Depression, testData$predicted_prob)
+plot(roc_curve, main = "ROC Curve for Depression Prediction")
+auc(roc_curve)
+
+```
+
+The model achieves an accuracy of 77.92% with a balanced approach to detecting both 0 (no depression) and 1 (depression). The sensitivity (70.65%) indicates that the model captures most cases of depression, while the specificity (83.06%) shows good performance in identifying individuals without depression. Key metrics like PPV (74.70%) and NPV (79.99%) demonstrate its reliability in predictions. While errors in classification are not evenly distributed (McNemar's Test: p-value = 1.361e-05), the overall balanced accuracy (76.86%) indicates that the model performs well for both classes.
+
+
+
+**Model 2** 
+
+
+The results of the logistic regression model can be interpreted using the provided odds ratios. The **intercept** has an odds value of **0.7518**, representing the baseline odds when all predictors are set to zero, which indicates a lower likelihood of the event (e.g., depression). For **Age**, the odds ratio is **0.9427**, meaning that for each one-unit increase in age, the odds of the event decrease by a factor of **0.9427**, or approximately **6.1%**. Similarly, **Study Satisfaction** has an odds ratio of **0.8759**, suggesting that a one-unit increase reduces the odds of the event by **12.4%**.
+
+On the other hand, **Academic Pressure** and **Financial Stress** have odds ratios of **1.6332** and **1.3937**, respectively. This indicates a **positive relationship** with the outcome: a one-unit increase in academic pressure increases the odds of the event by approximately **63.3%**, while a one-unit increase in financial stress increases the odds by about **39.4%**. Finally, **Sleep Duration** has a slightly negative effect, with an odds ratio of **0.9648**, meaning the odds decrease by **3.5%** for each additional unit of sleep. Overall, **Academic Pressure** and **Financial Stress** emerge as strong predictors that increase the likelihood of the event, while **Age**, **Study Satisfaction**, and **Sleep Duration** have negative relationships, reducing the odds of the event.
+
+```{r}
+model2 <- glm(Depression ~ Age  + Academic.Pressure  + 
+             Study.Satisfaction + Sleep.Duration + Financial.Stress, 
+             data = trainData, family = binomial(link = 'probit'))
+summary(model2)
+
+
+
+#Odds Event
+or_m2 <- exp(coef(model2))
+print(or_m2)
+
+
+# Predict probabilities on the test set using Probit Model
+testData$predicted_prob_probit <- predict(model2, newdata = testData, type = "response")
+
+# Odds Analysis: Convert probabilities to odds
+testData$predicted_odds_probit <- testData$predicted_prob_probit / (1 - testData$predicted_prob_probit)
+
+# Display a sample of predicted probabilities and odds
+print("Sample of Predicted Probabilities and Odds (Probit Model):")
+head(testData[, c("Depression", "predicted_prob_probit", "predicted_odds_probit")])
+
+# Confusion Matrix for Probit Model
+testData$predicted_class_probit <- ifelse(testData$predicted_prob_probit > 0.5, 1, 0)
+confusionMatrix(as.factor(testData$predicted_class_probit), testData$Depression)
+
+# Plotting ROC Curve for Probit Model
+roc_curve_probit <- roc(testData$Depression, testData$predicted_prob_probit)
+plot(roc_curve_probit, main = "ROC Curve for Probit Model")
+auc(roc_curve_probit)
+
+# Predict probabilities on the test set
+testData$predicted_prob <- predict(model, newdata = testData, type = "response")
+
+# Thresholding to classify predictions
+testData$predicted_class <- ifelse(testData$predicted_prob > 0.5, 1, 0)
+
+# Confusion Matrix
+confusionMatrix(as.factor(testData$predicted_class), testData$Depression)
+
+# Plotting ROC Curve
+library(pROC)
+roc_curve <- roc(testData$Depression, testData$predicted_prob)
+plot(roc_curve, main = "ROC Curve for Depression Prediction")
+auc(roc_curve)
+
+# Calculate Pseudo R-squared
+pseudo_r2 <- 1 - (model$deviance / null_model$deviance)
+cat("\nPseudo R-squared:", pseudo_r2, "\n")
+
+# Odds Probability Analysis
+# Display sample of predicted probabilities and odds from the logistic model
+testData$predicted_odds <- testData$predicted_prob / (1 - testData$predicted_prob)
+print("Sample of Predicted Probabilities and Odds (Logistic Model):")
+head(testData[, c("Depression", "predicted_prob", "predicted_odds")])
+
+```
+
+
+
+The ROC curve for the Probit Model, along with key performance metrics, confirms the model's strong ability to classify the binary outcome (`Depression`). The **Area Under the Curve (AUC)** is **0.85**, indicating excellent discrimination between the two classes. The model achieves an overall **accuracy of 77.92%**, which is significantly higher than the **No Information Rate (58.55%)**, with a p-value of **< 2.2e-16**, proving that its performance is far better than random guessing. The model balances both sensitivity and specificity, with a **sensitivity of 70.65%** (correctly identifying 70.65% of positives) and a **specificity of 83.06%** (avoiding 83.06% of false positives). The **balanced accuracy** is **76.86%**, showing fair performance across both classes, and the **Kappa statistic** of **0.5414** indicates moderate agreement between predictions and true outcomes. Additionally, the **Pseudo R-squared** value of **0.3042** suggests that the model explains approximately **30.4%** of the variability in the response variable. Overall, the ROC curve demonstrates the model's strong performance, effectively balancing true positive and false positive rates across various thresholds, with robust metrics to support its reliability in predicting depression.
 
 
