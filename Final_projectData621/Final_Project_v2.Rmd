@@ -19,31 +19,16 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
----
-title: "Final_projectData621"
-author: Warner Alexis, Saloua Daouki, Souleymane Doumbia, Fomba Kassoh, Lewris Mota Sanchez
-date: "2024-12-17"
-output:
-  word_document:
-    toc: true
-    toc_depth: '3'
-  pdf_document:
-    toc: true
-    toc_depth: '3'
-  html_document:
-    toc: true
-    toc_float: true
-    toc_depth: 3
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
 ## Abstract
+
+"This study explores the impact of socio-demographic and behavioral factors on depression and academic performance (CGPA) among 27,901 individuals aged 18 to 59. Using a variety of predictive models, we aim to identify key factors influencing both mental health and academic success. A binary logistic regression model identified significant predictors of depression, including academic pressure, work pressure, study satisfaction, sleep duration, and family history of mental illness, with an Area Under the Curve (AUC) of 0.9225, indicating excellent predictive performance. Additionally, a Random Forest model with 100 trees produced an out-of-bag error rate of 16.06% and an AUC of 0.9108, confirming the robustness of the findings. Key predictors for both depression and CGPA included financial stress and sleep habits. This study underscores the importance of addressing mental health and academic pressures to improve well-being and academic outcomes, offering insights into targeted interventions for at-risk individuals."
+
 The purpose of this project is to analyze and model factors associated with student depression and academic performance. This involves exploratory data analysis, data cleaning, transformation, and building predictive models to identify key variables impacting both mental health outcomes and CGPA. By examining the relationships between stressors, behaviors, and academic performance, the project provides insights into factors contributing to students' well-being and success.
 
 ## Introduction
+
+"Depression and academic performance are critical concerns that significantly impact students' well-being and success. Mental health issues, especially depression, have been linked to academic struggles, stress, and other socio-behavioral factors. This study investigates the complex relationship between mental health and academic achievement among individuals aged 18 to 59, focusing on factors such as academic pressure, work pressure, sleep duration, job satisfaction, and family history of mental illness. By leveraging machine learning techniques to predict depression and CGPA, this study seeks to identify high-risk individuals, offering opportunities for early intervention and better support systems."
+
 Student mental health and academic performance have become critical areas of focus, with increasing academic and financial stress impacting both well-being and educational outcomes. Using a dataset of 27,901 student records, we explore predictors of depression and CGPA, modeling their relationships with key variables such as Academic Pressure, Financial Stress, Sleep Duration, and Work/Study Hours. By employing statistical approaches, we aim to identify the most significant factors influencing student mental health and academic success.
 
 
@@ -64,7 +49,7 @@ library(corrplot)
 library(reshape2)
 
 # Load data without row names
-depr_data <- read.csv("https://raw.githubusercontent.com/joewarner89/Data-621-Repo-Assignemnt/refs/heads/main/Final_projectData621/student%20depression.csv?token=GHSAT0AAAAAAC3QXA36A7MNBS4DVD5DWB2EZ3B6NXQ", row.names = NULL)
+depr_data <- read.csv("student depression.csv", row.names = NULL)
 
 # Check for duplicate rows (optional)
 duplicated_rows <- anyDuplicated(depr_data)
@@ -990,3 +975,48 @@ print(paste("RMSE:", rmse_value))
 - Random Forest
 
 This comprehensive approach allows for accurate predictions and in-depth evaluation of the significant predictors for both **Depression** and **CGPA**. Let me know if further refinements are needed!
+
+## **Literature Review**:
+
+**I. Depression in Students: Predictors and Challenges**
+
+This article have a sample of 5,535 students across 26 U.S. colleges. It focuses on health-related quality of life (HRQoL) and its relationship with demographics and mental health comorbidities. The key finding of this research are:
+Female, minoritized, and lower socioeconomic status students reported lower HRQoL.
+Mental HRQoL was significantly influenced by gender and sexual orientation.
+Comorbidity (having multiple mental disorders) universally reduced HRQoL.
+Depression among students is influenced by a variety of factors, including academic pressure, socioeconomic status, sleep deprivation, and comorbid mental health conditions. Research has consistently shown that mental health disorders are prevalent in student populations, and these disorders can significantly impair Health-Related Quality of Life (HRQoL) (Baik et al., 2024).
+Baik et al. (2024) found that female, minoritized, and lower socioeconomic status students reported lower HRQoL compared to their peers. Additionally, the presence of comorbid mental disorders, such as anxiety and depression occurring together, further exacerbated these outcomes. This underscores the importance of understanding how multiple stressors impact students' mental health concurrently.
+Furthermore, while their study focused on college students, the findings highlight trends that are likely present in younger populations, such as middle and high school students. These factors necessitate interventions tailored to vulnerable groups who experience compounded mental health challenges.
+
+
+**II. Mental health consequences of academic stress,**
+
+This article studied a sample of 395 engineering students in India. It mostly focused on Factors contributing to mental health crises, particularly academic stress and motivation. The key finding of this study were:
+Academic amotivation mediates the relationship between academic stress and mental health status.
+Factors like parental pressure, identity centrality, and upward social comparison contribute to stress.
+Male students report better mental health but lower extrinsic motivation than female students.
+Research highlights that academic stress significantly impacts the mental health of engineering students, especially in India’s competitive academic environment. Factors such as intense coursework, parental pressure, and coaching experiences contribute to heightened anxiety, depression, and feelings of inadequacy. Amotivation, or the lack of drive to engage in academic tasks, mediates the relationship between stress and mental health outcomes, often leading to reduced performance and lower self-esteem. Self-Determination Theory (SDT) distinguishes between intrinsic and extrinsic motivation, emphasizing that students with diminished intrinsic motivation are more vulnerable to stress-related mental health issues. Additionally, upward social comparison and gender differences further exacerbate these challenges, with female students often reporting higher levels of stress and mental health concerns than their male peers.
+Parental expectations and the pressure to excel in coaching classes can lead to mental exhaustion even before college, setting the stage for ongoing psychological issues. Literature suggests that these pressures, combined with social comparisons, create a cycle of stress and deteriorating mental health. Addressing these issues requires targeted interventions to alleviate stress and foster healthy motivation, with attention to gender-specific challenges. These insights underscore the need for comprehensive support systems for students navigating high-pressure academic environments.
+
+
+
+**III. Anxiety and Depression Among School Students**
+
+Malak and Khalifeh (2018) explored the prevalence of anxiety and depression among school students in Jordan, identifying significant relationships with sociodemographic factors and Internet addiction, as well as the predictors of these mental health issues. The study focused on a sample of 800 students, aged 12-18 years, from 10 public schools in Amman, Jordan. Using standardized measurement tools, the study revealed that a significant portion of the students (42.1%) were experiencing anxiety, while a higher proportion (73.8%) showed symptoms of depression.
+The research identified key risk factors for both anxiety and depression, with school class and Internet addiction being the most prominent. Notably, Internet addiction emerged as the primary predictor for both mental health problems, suggesting that excessive time spent online may be contributing to increased psychological distress among students. This finding aligns with broader international studies that have identified a growing concern over the role of digital technology in the mental health of adolescents.
+The authors emphasized the importance of raising awareness about mental health issues among students and stakeholders, such as educators and parents. They also recommended the development of counseling programs and centers within schools to address the mental health needs of students more effectively. This study contributes to a growing body of research highlighting the significant impact of digital behavior, such as Internet addiction, on adolescent mental health, and stresses the need for intervention strategies aimed at mitigating these effects.
+In conclusion, the findings by Malak and Khalifeh (2018) shed light on the critical relationship between Internet addiction and mental health issues like anxiety and depression among school students in Jordan. The study calls for greater attention to the mental well-being of students, suggesting that targeted interventions, including mental health education and support systems, could help alleviate the burden of these mental health challenges.
+
+
+
+## **References**
+
+Baik, S. Y., Shin, K. E., Fitzsimmons-Craft, E. E., Eisenberg, D., Wilfley, D. E., Taylor, C. B., & Newman, M. G. (2024). The relationship of race, ethnicity, gender identity, sex assigned at birth, sexual orientation, parental education, financial hardship, and comorbid mental disorders with quality of life in college students with anxiety, depression, or eating disorders. Journal of Affective Disorders, 366, 335–344. 
+https://www-sciencedirect-com.central.ezproxy.cuny.edu/science/article/pii/S016503272401320X?via=ihub
+
+Maji, S., Chaturmohta, A., Deevela, D., Sinha, S., Tarsolia, S., & Barsaiya, A. (2024). Mental health consequences of academic stress, amotivation, and coaching experience: A study of India's top engineering undergraduates. Psychology in the Schools, 61(9), 3540-3566. 
+https://onlinelibrary-wiley-com.central.ezproxy.cuny.edu/doi/10.1002/pits.23230
+
+Malak, M. Z., & Khalifeh, A. H. (2018). Anxiety and depression among school students in Jordan: Prevalence, risk factors, and predictors. Perspectives in Psychiatric Care, 54(2), 242-250. 
+https://web-p-ebscohost-com.central.ezproxy.cuny.edu/ehost/pdfviewer/pdfviewer?vid=23&sid=7b41e2dc-152c-45a0-a67b-f7b01c43396e@redis
+
