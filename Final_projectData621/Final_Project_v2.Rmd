@@ -1003,8 +1003,11 @@ Parental expectations and the pressure to excel in coaching classes can lead to 
 **III. Anxiety and Depression Among School Students**
 
 Malak and Khalifeh (2018) explored the prevalence of anxiety and depression among school students in Jordan, identifying significant relationships with sociodemographic factors and Internet addiction, as well as the predictors of these mental health issues. The study focused on a sample of 800 students, aged 12-18 years, from 10 public schools in Amman, Jordan. Using standardized measurement tools, the study revealed that a significant portion of the students (42.1%) were experiencing anxiety, while a higher proportion (73.8%) showed symptoms of depression.
+
 The research identified key risk factors for both anxiety and depression, with school class and Internet addiction being the most prominent. Notably, Internet addiction emerged as the primary predictor for both mental health problems, suggesting that excessive time spent online may be contributing to increased psychological distress among students. This finding aligns with broader international studies that have identified a growing concern over the role of digital technology in the mental health of adolescents.
+
 The authors emphasized the importance of raising awareness about mental health issues among students and stakeholders, such as educators and parents. They also recommended the development of counseling programs and centers within schools to address the mental health needs of students more effectively. This study contributes to a growing body of research highlighting the significant impact of digital behavior, such as Internet addiction, on adolescent mental health, and stresses the need for intervention strategies aimed at mitigating these effects.
+
 In conclusion, the findings by Malak and Khalifeh (2018) shed light on the critical relationship between Internet addiction and mental health issues like anxiety and depression among school students in Jordan. The study calls for greater attention to the mental well-being of students, suggesting that targeted interventions, including mental health education and support systems, could help alleviate the burden of these mental health challenges.
 
 So based on the three articles above, here are more details and connections to our project:
